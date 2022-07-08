@@ -5,82 +5,89 @@
 #include "global.h"
 #include "energy_changes.h"
 
-//std::uniform_int_distribution<int> unidir(0, 2);
-//std::uniform_int_distribution<int> unidir_loop(1, 5);
-//std::uniform_int_distribution<int> unimove(0, 2);
-//std::uniform_int_distribution<int> unimove2(0, 1);
-//std::uniform_int_distribution<int> unipol(0, 1);
-//std::uniform_int_distribution<int> unisite(0, pol_length-1); //Replace 463 with pol_length-1 and make sure it works!
-
+//Note locations tracks physical monomers, ie pol index/reduction_factor. Same as indeces of total_contacts and contacts
 void update_contacts(int thread_num, int moved_site, Eigen::Vector3i prop_move, int m){
+    if (moved_site%reduction_factor != 0){ //unphysical; not tracked
+        return;
+    }
+    int red_site=moved_site/reduction_factor;
     //Throw away old contacts_lin[thread_num], at the same time update contact frequency map
     for (auto elem : locations[thread_num][{polymer[thread_num][moved_site][0], polymer[thread_num][moved_site][1], polymer[thread_num][moved_site][2]}]) {
-        if (elem != moved_site) {
-            int i = std::min(elem, moved_site);
-            int j = std::max(elem, moved_site);
+        if (elem != red_site) {
+            int i = std::min(elem, red_site);
+            int j = std::max(elem, red_site);
             total_contacts[thread_num][i][j] += double(m) - contacts[thread_num][{i,j}];
             // GG: here one can save other total contacts
             contacts[thread_num].erase({i, j});
         }
     }
     for (auto elem : locations_lin[thread_num][{polymer[thread_num][moved_site][0], polymer[thread_num][moved_site][1], polymer[thread_num][moved_site][2]}]) {
-        if (elem != moved_site) {
-            int i = std::min(elem, moved_site);
-            int j = std::max(elem, moved_site);
-            total_contacts[thread_num][i][j] += double(m) - contacts_inter[thread_num][{moved_site, elem}]; // [{index within circular, index within linear}]
+        if (elem != red_site) {
+            int i = std::min(elem, red_site);
+            int j = std::max(elem, red_site);
+            total_contacts[thread_num][i][j] += double(m) - contacts_inter[thread_num][{red_site, elem}]; // [{index within circular, index within linear}]
             // GG: here one can save other total contacts
-            contacts_inter[thread_num].erase({moved_site, elem});
+            contacts_inter[thread_num].erase({red_site, elem});
         }
     }
     //put in new contacts[thread_num]
     if (locations[thread_num].find({prop_move[0], prop_move[1], prop_move[2]}) != locations[thread_num].end()) {
         for (auto elem : locations[thread_num][{prop_move[0], prop_move[1], prop_move[2]}]) {
-            contacts[thread_num][{std::min(elem, moved_site),std::max(elem, moved_site)}] = m;
+            contacts[thread_num][{std::min(elem, red_site),std::max(elem, red_site)}] = m;
         }
     }
     if (locations_lin[thread_num].find({prop_move[0], prop_move[1], prop_move[2]}) != locations_lin[thread_num].end()) {
         for (auto elem : locations_lin[thread_num][{prop_move[0], prop_move[1], prop_move[2]}]) {
-            contacts_inter[thread_num][{moved_site, elem}] = m; // [{index within circular, index within linear}]
+            contacts_inter[thread_num][{red_site, elem}] = m; // [{index within circular, index within linear}]
         }
     }
 }
 
 
 void update_contacts_lin(int thread_num, int moved_site, Eigen::Vector3i prop_move, int m){
+    if (moved_site%reduction_factor != 0){ //unphysical; not tracked
+        return;
+    }
+    int red_site=moved_site/reduction_factor;
     //Throw away old contacts_lin[thread_num], at the same time update contact frequency map
     for (auto elem : locations_lin[thread_num].find({ lin_polymer[thread_num][moved_site][0],lin_polymer[thread_num][moved_site][1],lin_polymer[thread_num][moved_site][2] })->second) {
-        if (elem != moved_site) {
-            int i = std::min(elem, moved_site);
-            int j = std::max(elem, moved_site);
+        if (elem != red_site) {
+            int i = std::min(elem, red_site);
+            int j = std::max(elem, red_site);
             total_contacts[thread_num][i][j] += double(m) - contacts_lin[thread_num][{i, j}];
             // GG: here one can save other total contacts
             contacts_lin[thread_num].erase({i, j});
         }
     }
     for (auto elem : locations[thread_num][{ lin_polymer[thread_num][moved_site][0],lin_polymer[thread_num][moved_site][1],lin_polymer[thread_num][moved_site][2] }]) {
-        if (elem != moved_site) {
-            int i = std::min(elem, moved_site);
-            int j = std::max(elem, moved_site);
-            total_contacts[thread_num][i][j] += double(m) - contacts_inter[thread_num][{elem, moved_site}];
+        if (elem != red_site) {
+            int i = std::min(elem, red_site);
+            int j = std::max(elem, red_site);
+            total_contacts[thread_num][i][j] += double(m) - contacts_inter[thread_num][{elem, red_site}];
             // GG: here one can save other total contacts
-            contacts_inter[thread_num].erase({ elem, moved_site });
+            contacts_inter[thread_num].erase({ elem, red_site });
         }
     }
     //put in new contacts[thread_num]
     if (locations_lin[thread_num].find({ prop_move[0],prop_move[1],prop_move[2] }) != locations_lin[thread_num].end()) {
         for (auto elem : locations_lin[thread_num].find({ prop_move[0],prop_move[1],prop_move[2] })->second) {
-            contacts_lin[thread_num][{std::min(elem, moved_site), std::max(elem, moved_site)}] = m;
+            contacts_lin[thread_num][{std::min(elem, red_site), std::max(elem, red_site)}] = m;
         }
     }
     if (locations[thread_num].find({ prop_move[0],prop_move[1],prop_move[2] }) != locations[thread_num].end()) {
         for (auto elem : locations[thread_num][{ prop_move[0],prop_move[1],prop_move[2] }]) {
-            contacts_inter[thread_num][{elem, moved_site}] = m;
+            contacts_inter[thread_num][{elem, red_site}] = m;
         }
     }
 }
 
 
 void update_locations(int thread_num, int moved_site, Eigen::Vector3i prop_move){
+    if (moved_site%reduction_factor != 0){ //unphysical; not tracked
+        return;
+    }
+    int red_site=moved_site/reduction_factor;
+
     //update hash map locations[thread_num]
     std::vector<int> site_coords = { polymer[thread_num][moved_site][0], polymer[thread_num][moved_site][1], polymer[thread_num][moved_site][2] };
     std::vector<int> prop_move_vec = {prop_move[0], prop_move[1], prop_move[2]};
@@ -89,19 +96,23 @@ void update_locations(int thread_num, int moved_site, Eigen::Vector3i prop_move)
         locations[thread_num].erase(site_coords);
     }
     else {
-        locations[thread_num][site_coords].erase(std::find(locations[thread_num][site_coords].begin(), locations[thread_num][site_coords].end(), moved_site));
+        locations[thread_num][site_coords].erase(std::find(locations[thread_num][site_coords].begin(), locations[thread_num][site_coords].end(), red_site));
     }
     // save new locations
     if (locations[thread_num].find(prop_move_vec) != locations[thread_num].end()) {
-        locations[thread_num][prop_move_vec].push_back(moved_site);
+        locations[thread_num][prop_move_vec].push_back(red_site);
     }
     else {
-        locations[thread_num][prop_move_vec] = { moved_site };
+        locations[thread_num][prop_move_vec] = { red_site };
     }
 }
 
 
 void update_locations_lin(int thread_num, int moved_site, Eigen::Vector3i prop_move){
+    if (moved_site%reduction_factor != 0){ //unphysical; not tracked
+        return;
+    }
+    int red_site=moved_site/reduction_factor;
     //update hash map locations[thread_num]
     std::vector<int> site_coords = { lin_polymer[thread_num][moved_site][0],lin_polymer[thread_num][moved_site][1],lin_polymer[thread_num][moved_site][2] };
     std::vector<int> prop_move_vec = {prop_move[0], prop_move[1], prop_move[2]};
@@ -110,14 +121,14 @@ void update_locations_lin(int thread_num, int moved_site, Eigen::Vector3i prop_m
         locations_lin[thread_num].erase(site_coords);
     }
     else {
-        locations_lin[thread_num][site_coords].erase(std::find(locations_lin[thread_num][site_coords].begin(), locations_lin[thread_num][site_coords].end(), moved_site));
+        locations_lin[thread_num][site_coords].erase(std::find(locations_lin[thread_num][site_coords].begin(), locations_lin[thread_num][site_coords].end(), red_site));
     }
     // save new locations
     if (locations_lin[thread_num].find(prop_move_vec) != locations_lin[thread_num].end()) {
-        locations_lin[thread_num][prop_move_vec].push_back(moved_site);
+        locations_lin[thread_num][prop_move_vec].push_back(red_site);
     }
     else {
-        locations_lin[thread_num][prop_move_vec] = { moved_site };
+        locations_lin[thread_num][prop_move_vec] = { red_site };
     }
 }
 
@@ -366,8 +377,9 @@ void loop_move_lin(int thread_num, int site, int &m, int lin_pol) {
 }
 
 void move(int thread_num, int &m) {
-    int site = generators[thread_num].unisite();
-    int lin_pol = generators[thread_num].unipol(); //GG Picks up linear polymer with prob. 0.5, even if the replication just started - probably slows down relaxation of the ring polymer. Make it proportional to len(lin_polymer)?
+    int lin_pol = generators[thread_num].weightedpol(); //JH: prob proportional to replicated length
+    //Pick site on linear or full chromosome:
+    int site = (lin_pol==1) ? generators[thread_num].unisitelin() : generators[thread_num].unisitering();
 
 //    int stage = thread_num % number_of_stages;
     int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)

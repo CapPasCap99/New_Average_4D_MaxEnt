@@ -5,30 +5,35 @@
 #ifndef INC_4DCHROM_LUCAS_RANDOMGENERATOR_H
 #define INC_4DCHROM_LUCAS_RANDOMGENERATOR_H
 
-#include <random>
+#include <boost/random.hpp>
 
 class RandomGenerator{
 public:
-    RandomGenerator(int seed, int len);
+    RandomGenerator(int seed, int len, int lin_len, int OriC);
     int unidir();
     int unidir_loop();
     int unimove();
     int unimove2();
-    int unipol();
-    int unisite(); //now can be easily modified for a better choice of random sites (to have less uncounted moves)
+    int weightedpol();
+    int unisitering(); //now can be easily modified for a better choice of random sites (to have less uncounted moves)
+    int unisitelin();
     double disReal();
 
 private:
     int len; //polymer length
-    std::mt19937_64 gen;
-    std::uniform_real_distribution<double> unireal {0,1};
-    std::uniform_int_distribution<int> uniint01 {0,1};
-    std::uniform_int_distribution<int> uniint02 {0,2};
-    std::uniform_int_distribution<int> uniint15 {1,5};
+    int linlen; //linear polymer is length 2*linlen+1
+    int OriC;
+    boost::random::mt19937_64 gen;
+    boost::random::uniform_01<double> unireal;
+    boost::uniform_int<int> uniint01{0,1};
+    boost::uniform_int<int> uniint02{0,2};
+    boost::uniform_int<int> uniint15{1,5};
 };
 
-RandomGenerator::RandomGenerator(int seed, int len) {
+RandomGenerator::RandomGenerator(int seed, int len, int lin_len, int OriC) {
     this -> len = len;
+    this -> linlen=lin_len;
+    this -> OriC = OriC;
     gen.seed(seed);
 }
 int RandomGenerator::unidir() {
@@ -43,11 +48,14 @@ int RandomGenerator::unimove() {
 int RandomGenerator::unimove2() {
     return uniint01(gen);
 }
-int RandomGenerator::unipol() {
-    return uniint01(gen);
+int RandomGenerator::weightedpol() {
+    return boost::random::discrete_distribution<int,int>{len,2*linlen}(gen);
 }
-int RandomGenerator::unisite() {
+int RandomGenerator::unisitering() {
     return std::uniform_int_distribution<int>{0, len-1}(gen);
+}
+int RandomGenerator::unisitelin() {
+    return (std::uniform_int_distribution<int>{OriC-linlen,OriC+linlen-1}(gen))%len;
 }
 double RandomGenerator::disReal() {
     return unireal(gen);

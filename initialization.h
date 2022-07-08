@@ -5,6 +5,11 @@
 #include "moves.h"
 using namespace Eigen;
 
+/*
+All of these maps store only physical monomers, ie polymer index/reduction_factor
+Makes maps 4*smaller, meaning searches are a lot faster.
+Note that polymer and lin_polymer arrays use full indeces; these keep track of unphysical monomers
+*/
 std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts(number_of_threads);
 std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> locations(number_of_threads);
 
@@ -75,64 +80,75 @@ void initialize(int thread_num, int step) {
     }
 
 
-    // set contacts and locations //
-    for (int i = 0; i < pol_length; i++) {
+    // set contacts and locations. ONLY TRACK PHYSICAL CONTACTS. //
+    for (int i = 0; i < pol_length; i+=reduction_factor) { //Ring ring contacts
+        int red_i = i/reduction_factor;
         if (locations[thread_num].find({ polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2] }) != locations[thread_num].end()) {
             for (auto elem : locations[thread_num][{ polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2] }]) {
-                contacts[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                contacts[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
             }
         }
-        locations[thread_num][{polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2]}].push_back(i);
+        locations[thread_num][{polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2]}].push_back(red_i);
     }
     if (lin_length[stage] != 0) {
         if (lin_length[stage] < pol_length/2) {
-            if (oriC + lin_length[stage] >= pol_length) {
-                for (int i = 0; i < pol_length; i++) {
+            if (oriC + lin_length[stage] >= pol_length) { //need periodic bcs
+                for (int i = 0; i < pol_length; i+=reduction_factor) {
+                    int red_i=i/reduction_factor;
                     if (i > oriC - lin_length[stage] || i < (oriC + lin_length[stage]) % pol_length) {
+                        //Lin lin
                         if (locations_lin[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}) != locations_lin[thread_num].end()) {
                             for (auto elem : locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}]) {
-                                contacts_lin[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                                contacts_lin[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                             }
                         }
+                        //Ring lin
                         if (locations[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}) != locations[thread_num].end()) {
                             for (auto elem : locations[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}]) {
-                                contacts_inter[thread_num][{elem, i}] = 0;
+                                contacts_inter[thread_num][{elem, red_i}] = 0;
                             }
                         }
-                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}].push_back(i);
+                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}].push_back(red_i);
                     }
                 }
-            } else {
-                for (int i = 0; i < pol_length; i++) {
+            }
+            else { //replication not past zero; no periodicity needed
+                for (int i = 0; i < pol_length; i+=reduction_factor) {
+                    int red_i=i/reduction_factor;
+
                     if (i > oriC - lin_length[stage] && i < oriC + lin_length[stage]) {
+                        //lin lin
                         if (locations_lin[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}) !=locations_lin[thread_num].end()) {
                             for (auto elem : locations_lin[thread_num][{lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}]) {
-                                contacts_lin[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                                contacts_lin[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                             }
                         }
+                        //ring lin
                         if (locations[thread_num].find({ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }) != locations[thread_num].end()) {
                             for (auto elem : locations[thread_num][{ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }]) {
-                                contacts_inter[thread_num][{elem, i}] = 0;
+                                contacts_inter[thread_num][{elem, red_i}] = 0;
                             }
                         }
-                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(i);
+                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(red_i);
                     }
                 }
             }
         }
-        else {
-            for (int i = 0; i < pol_length; i++) {
+        else { //fully replicated
+            for (int i = 0; i < pol_length; i+=reduction_factor) {
+                int red_i=i/reduction_factor;
+
                 if (locations_lin[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}) !=locations_lin[thread_num].end()) {
                     for (auto elem : locations_lin[thread_num][{lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}]) {
-                        contacts_lin[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                        contacts_lin[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                     }
                 }
                 if (locations[thread_num].find({ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }) != locations[thread_num].end()) {
                     for (auto elem : locations[thread_num][{ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }]) {
-                        contacts_inter[thread_num][{elem, i}] = 0;
+                        contacts_inter[thread_num][{elem, red_i}] = 0;
                     }
                 }
-                locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(i);
+                locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(red_i);
             }
         }
     }
@@ -146,7 +162,7 @@ void burn_in(int thread_num, int n_steps) {
 //    int stage = thread_num % number_of_stages;
     int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
 
-    std::vector<double> zeroVec(pol_length, 0);
+    std::vector<double> zeroVec(bin_num, 0);
     std::fill(total_contacts[thread_num].begin(), total_contacts[thread_num].end(), zeroVec);
     z_close[thread_num] = 0;
     z_far[thread_num] = 0;
@@ -165,63 +181,74 @@ void burn_in(int thread_num, int n_steps) {
     contacts[thread_num].clear();
     contacts_lin[thread_num].clear();
     contacts_inter[thread_num].clear();
-    for (int i = 0; i < pol_length; i++) {
+
+    //Fill in contacts and locations
+    for (int i = 0; i < pol_length; i+=reduction_factor) { //Ring ring contacts
+        int red_i = i/reduction_factor;
         if (locations[thread_num].find({ polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2] }) != locations[thread_num].end()) {
             for (auto elem : locations[thread_num][{ polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2] }]) {
-                contacts[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                contacts[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
             }
         }
-        locations[thread_num][{polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2]}].push_back(i);
+        locations[thread_num][{polymer[thread_num][i][0],polymer[thread_num][i][1],polymer[thread_num][i][2]}].push_back(red_i);
     }
     if (lin_length[stage] != 0) {
         if (lin_length[stage] < pol_length/2) {
-            if (oriC + lin_length[stage] >= pol_length) {
-                for (int i = 0; i < pol_length; i++) {
+            if (oriC + lin_length[stage] >= pol_length) { //need periodic bcs
+                for (int i = 0; i < pol_length; i+=reduction_factor) {
+                    int red_i=i/reduction_factor;
                     if (i > oriC - lin_length[stage] || i < (oriC + lin_length[stage]) % pol_length) {
+                        //Lin lin
                         if (locations_lin[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}) != locations_lin[thread_num].end()) {
                             for (auto elem : locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}]) {
-                                contacts_lin[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                                contacts_lin[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                             }
                         }
+                        //Ring lin
                         if (locations[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}) != locations[thread_num].end()) {
                             for (auto elem : locations[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}]) {
-                                contacts_inter[thread_num][{elem, i}] = 0;
+                                contacts_inter[thread_num][{elem, red_i}] = 0;
                             }
                         }
-                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}].push_back(i);
+                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1], lin_polymer[thread_num][i][2]}].push_back(red_i);
                     }
                 }
-            } else {
-                for (int i = 0; i < pol_length; i++) {
+            }
+            else { //replication not past zero; no periodicity needed
+                for (int i = 0; i < pol_length; i+=reduction_factor) {
+                    int red_i=i/reduction_factor;
                     if (i > oriC - lin_length[stage] && i < oriC + lin_length[stage]) {
+                        //lin lin
                         if (locations_lin[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}) !=locations_lin[thread_num].end()) {
                             for (auto elem : locations_lin[thread_num][{lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}]) {
-                                contacts_lin[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                                contacts_lin[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                             }
                         }
+                        //ring lin
                         if (locations[thread_num].find({ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }) != locations[thread_num].end()) {
                             for (auto elem : locations[thread_num][{ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }]) {
-                                contacts_inter[thread_num][{elem, i}] = 0;
+                                contacts_inter[thread_num][{elem, red_i}] = 0;
                             }
                         }
-                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(i);
+                        locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(red_i);
                     }
                 }
             }
         }
-        else {
-            for (int i = 0; i < pol_length; i++) {
+        else { //fully replicated
+            for (int i = 0; i < pol_length; i+=reduction_factor) {
+                int red_i=i/reduction_factor;
                 if (locations_lin[thread_num].find({lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}) !=locations_lin[thread_num].end()) {
                     for (auto elem : locations_lin[thread_num][{lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}]) {
-                        contacts_lin[thread_num][{std::min(elem, i), std::max(elem, i)}] = 0;
+                        contacts_lin[thread_num][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                     }
                 }
                 if (locations[thread_num].find({ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }) != locations[thread_num].end()) {
                     for (auto elem : locations[thread_num][{ lin_polymer[thread_num][i][0],lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2] }]) {
-                        contacts_inter[thread_num][{elem, i}] = 0;
+                        contacts_inter[thread_num][{elem, red_i}] = 0;
                     }
                 }
-                locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(i);
+                locations_lin[thread_num][{lin_polymer[thread_num][i][0], lin_polymer[thread_num][i][1],lin_polymer[thread_num][i][2]}].push_back(red_i);
             }
         }
     }

@@ -5,74 +5,6 @@
 #include "global.h"
 using namespace Eigen;
 
-//std::mt19937_64 gen(time(nullptr));
-//std::uniform_real_distribution<> disReal;
-
-//bool pol_close_pole(int site, int thread_num) { //find polymer site closest to pole and set the z value of the close pole
-//    if (oriC + lin_length[thread_num] >= pol_length) {
-//        if (site > oriC - lin_length[thread_num] || site < (oriC + lin_length[thread_num]) % pol_length) { //is replicated
-//            if (std::abs(polymer[thread_num][site][2] - offset_z[thread_num]) < std::abs(lin_polymer[thread_num][site][2] - offset_z[thread_num])) { //is farer from pole
-//                if (lin_polymer[thread_num][site][2]<=0) {
-//                    pole[thread_num] = -space[thread_num];
-//                }
-//                else {
-//                    pole[thread_num] = space[thread_num] + 2*offset_z[thread_num];
-//                }
-//                return false;
-//            }
-//            else {
-//                if (polymer[thread_num][site][2]<=0) {
-//                    pole[thread_num] = -space[thread_num];
-//                }
-//                else {
-//                    pole[thread_num] = space[thread_num] + 2*offset_z[thread_num];
-//                }
-//                return true;
-//            }
-//        }
-//        else {
-//            if (polymer[thread_num][site][2]<=0) {
-//                pole[thread_num] = -space[thread_num];
-//            }
-//            else {
-//                pole[thread_num] = space[thread_num] + 2*offset_z[thread_num];
-//            }
-//            return true;
-//        }
-//    }
-//    else {
-//        if (site > oriC - lin_length[thread_num] && site < oriC + lin_length[thread_num]) {  //is replicated
-//            if (std::abs(polymer[thread_num][site][2] - offset_z[thread_num]) < std::abs(lin_polymer[thread_num][site][2] - offset_z[thread_num])) { //is farer from pole
-//                if (lin_polymer[thread_num][site][2]<=0) {
-//                    pole[thread_num] = -space[thread_num];
-//                }
-//                else {
-//                    pole[thread_num] = space[thread_num] + 2*offset_z[thread_num];
-//                }
-//                return false;
-//            }
-//            else {
-//                if (polymer[thread_num][site][2]<=0) {
-//                    pole[thread_num] = -space[thread_num];
-//                }
-//                else {
-//                    pole[thread_num] = space[thread_num] + 2*offset_z[thread_num];
-//                }
-//                return true;
-//            }
-//        }
-//        else {
-//            if (polymer[thread_num][site][2]<=0) {
-//                pole[thread_num] = -space[thread_num];
-//            }
-//            else {
-//                pole[thread_num] = space[thread_num] + 2*offset_z[thread_num];
-//            }
-//            return true;
-//        }
-//    }
-//}
-
 bool accept_move(int thread_num, const double& delta_E) {
     return generators[thread_num].disReal() <= exp(-delta_E);
 }
@@ -82,26 +14,33 @@ double delta_E_other(std::vector<Vector3i>& polym, std::vector<Vector3i>& other_
 //    int stage = thread_num % number_of_stages;
     int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
 
-    if (locations[thread_num].find({ prop_move1[0],prop_move1[1],prop_move1[2] }) != locations[thread_num].end()) {
-        for (auto elem : locations[thread_num][{ prop_move1[0],prop_move1[1],prop_move1[2] }]) {
-            energy_change += Interaction_E[elem][(site + 1) % pol_length];
+    //Energies from contacts if (site+1)%pol_length is a physical monomer
+    if((site+1)%reduction_factor==0){
+        int red_i_plus_one=((site + 1) % pol_length)/reduction_factor;
+        if (locations[thread_num].find({ prop_move1[0],prop_move1[1],prop_move1[2] }) != locations[thread_num].end()) {
+            for (auto elem : locations[thread_num][{ prop_move1[0],prop_move1[1],prop_move1[2] }]) {
+                energy_change += Interaction_E[elem][red_i_plus_one];
+            }
+        }
+        if (locations_lin[thread_num].find({ prop_move1[0],prop_move1[1],prop_move1[2] }) != locations[thread_num].end()) {
+            for (auto elem : locations_lin[thread_num][{ prop_move1[0],prop_move1[1],prop_move1[2] }]) {
+                energy_change += Interaction_E[elem][red_i_plus_one];
+            }
+        }
+        for (auto elem : locations[thread_num][{ polym[(site + 1) % pol_length][0],polym[(site + 1) % pol_length][1],polym[(site + 1) % pol_length][2] }]) {
+            if (elem != red_i_plus_one) {
+                energy_change -= Interaction_E[elem][red_i_plus_one];
+            }
+        }
+        for (auto elem : locations_lin[thread_num][{ polym[(site + 1) % pol_length][0],polym[(site + 1) % pol_length][1],polym[(site + 1) % pol_length][2] }]) {
+            if (elem != red_i_plus_one) {
+                energy_change -= Interaction_E[elem][red_i_plus_one];
+            }
         }
     }
-    if (locations_lin[thread_num].find({ prop_move1[0],prop_move1[1],prop_move1[2] }) != locations[thread_num].end()) {
-        for (auto elem : locations_lin[thread_num][{ prop_move1[0],prop_move1[1],prop_move1[2] }]) {
-            energy_change += Interaction_E[elem][(site + 1) % pol_length];
-        }
-    }
-    for (auto elem : locations[thread_num][{ polym[(site + 1) % pol_length][0],polym[(site + 1) % pol_length][1],polym[(site + 1) % pol_length][2] }]) {
-        if (elem != (site + 1) % pol_length) {
-            energy_change -= Interaction_E[elem][(site + 1) % pol_length];
-        }
-    }
-    for (auto elem : locations_lin[thread_num][{ polym[(site + 1) % pol_length][0],polym[(site + 1) % pol_length][1],polym[(site + 1) % pol_length][2] }]) {
-        if (elem != (site + 1) % pol_length) {
-            energy_change -= Interaction_E[elem][(site + 1) % pol_length];
-        }
-    }
+
+
+    //Non-contact energy contributions
     if (lin_length[stage] !=0) {
         if (site + 1 == oriC && lin_pol) { // lin_polymer oriC
 //            if (pol_close_pole(site+1,thread_num)) {
@@ -124,7 +63,7 @@ double delta_E_other(std::vector<Vector3i>& polym, std::vector<Vector3i>& other_
             energy_change += alpha2[thread_num%number_of_stages] * (pow(prop_move1[2] -xp_z_close_simunits[thread_num%number_of_stages],2) - pow(polym[site + 1][2] -xp_z_close_simunits[thread_num%number_of_stages],2));
         }
     }
-    else {
+    else { //single chromosome
         if (site + 1 == oriC) {
 //            if (pol_close_pole(site+1,thread_num)) {
 //                energy_change += alpha[thread_num % number_of_stages] * (std::abs(prop_move1[2] - pole[thread_num]) - std::abs(polym[site + 1][2] - pole[thread_num]));
