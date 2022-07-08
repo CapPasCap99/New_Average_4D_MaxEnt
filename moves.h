@@ -5,13 +5,6 @@
 #include "global.h"
 #include "energy_changes.h"
 
-//std::uniform_int_distribution<int> unidir(0, 2);
-//std::uniform_int_distribution<int> unidir_loop(1, 5);
-//std::uniform_int_distribution<int> unimove(0, 2);
-//std::uniform_int_distribution<int> unimove2(0, 1);
-//std::uniform_int_distribution<int> unipol(0, 1);
-//std::uniform_int_distribution<int> unisite(0, pol_length-1); //Replace 463 with pol_length-1 and make sure it works!
-
 void update_contacts(int thread_num, int moved_site, Eigen::Vector3i prop_move, int m){
     //Throw away old contacts_lin[thread_num], at the same time update contact frequency map
     for (auto elem : locations[thread_num][{polymer[thread_num][moved_site][0], polymer[thread_num][moved_site][1], polymer[thread_num][moved_site][2]}]) {
@@ -366,8 +359,9 @@ void loop_move_lin(int thread_num, int site, int &m, int lin_pol) {
 }
 
 void move(int thread_num, int &m) {
-    int site = generators[thread_num].unisite();
-    int lin_pol = generators[thread_num].unipol(); //GG Picks up linear polymer with prob. 0.5, even if the replication just started - probably slows down relaxation of the ring polymer. Make it proportional to len(lin_polymer)?
+    int lin_pol = generators[thread_num].weightedpol(); //JH: prob proportional to replicated length
+    //Pick site on linear or full chromosome:
+    int site = (lin_pol==1) ? generators[thread_num].unisitelin() : generators[thread_num].unisitering();
 
 //    int stage = thread_num % number_of_stages;
     int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)

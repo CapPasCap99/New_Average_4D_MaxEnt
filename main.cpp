@@ -244,7 +244,7 @@ int main() {
 
     // create and seed random generators //
     for (int i=0; i<number_of_threads; i++){
-        generators.push_back( RandomGenerator(int(time_now) + i, pol_length) ); //GG: probably not the best way to seed...
+        generators.push_back( RandomGenerator(int(time_now) + i, pol_length, lin_length[i], oriC) );
     }
 
     // set values offset_z //
