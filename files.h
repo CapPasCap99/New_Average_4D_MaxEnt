@@ -27,40 +27,16 @@ void read_constraints(std::vector<double> &target_vector, std::string& filename)
     values.close();
 }
 
-//JM: This part does not do any modifiation if 'fine' is 1, and the 'ends' are longer than the polymer
-std::vector<std::vector<double>> fold(std::vector<std::vector<double>> map) {                                             // is used to converse between stretched and unstretched terminus as well as between the contact map where every second monomer is a genomic region and the contact map where every entry is a genomic region
-//    std::vector<std::vector<double>> add_map(pol_length/2, std::vector<double>(pol_length/2, 0));
-    std::vector<std::vector<double>> file_map(bin_num, std::vector<double>(bin_num, 0));
-    for (int i = 0; i < pol_length/reduction_factor; i++) {
-        for (int j = 0; j < pol_length / reduction_factor; j++) {
-            file_map[i][j] = map[reduction_factor * i][reduction_factor * j];
-        }
-    }
-    return file_map;
-}
-
-std::vector<std::vector<double>> unfold(std::vector<std::vector<double>> map) {
-    std::vector<std::vector<double>> unfold_map(pol_length, std::vector<double> (pol_length,0));
-    for (int i = 0; i < bin_num; i++) {                                 //unfold energies
-        for (int j = 0; j < bin_num; j++) {
-            unfold_map[reduction_factor *i][reduction_factor *j] = map[i][j];
-        }
-    }
-    return unfold_map;
-}
-
 void read_interaction_energies(std::string& old_simulation_folder, std::string& iteration) {
     std::ifstream couplings;
     couplings.open(dir + old_simulation_folder + "Energies/energies_" + iteration + ".txt");  //read in energies
     if(couplings.fail()){throw std::invalid_argument( "Interaction energies input file doesnt exist." );}
-    std::vector<std::vector<double>> energies (bin_num, std::vector<double> (bin_num,0));
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
-            couplings >> energies[i][j];
+            couplings >> Interaction_E[i][j];
         }
     }
     couplings.close();
-    Interaction_E = unfold(energies);
 }
 
 void check_input_energies_compatibility(std::string& old_simulation_folder, std::string& iteration){
@@ -293,12 +269,11 @@ void get_energies_plot(const int& steps) { //saves energies as matrix
 //        }
 //        std::cout << std::endl;
 //    }
-    std::vector<std::vector<double>> file_energies = fold(Interaction_E);
 
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
             double contact;
-            contact = file_energies[i][j];
+            contact = Interaction_E[i][j];
             final_energies << contact << ' ';
         }
         final_energies << '\n';
@@ -311,29 +286,17 @@ void get_final_contacts(const int& step) {
     fn << dir << output_folder << "/" << "Contacts/contacts_" << step << ".txt";
     std::ofstream final_cont;
     final_cont.open(fn.str().c_str(), std::ios_base::binary); //write contact frequencies
-    std::vector<std::vector<double>> file_contacts = fold(final_contacts);
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
             double contact;
             if (std::abs(i-j) <= 1 || (i==0 && j == bin_num - 1) || (j==0 && i == bin_num - 1)) { contact = 0; }
             else {
-                contact = file_contacts[i][j];
+                contact = final_contacts[i][j];
             }
             final_cont << contact << ' ';
         }
         final_cont << '\n';
     }
-//    for (int i = 0; i < pol_length; i++) {
-//        for (int j = 0; j < pol_length; j++) {
-//            double contact;
-//            if (i == j) { contact = 0; }
-//            else {
-//                contact = final_contacts[i][j];
-//            }
-//            final_cont << contact << ' ';
-//        }
-//        final_cont << '\n';
-//    }
 }
 
 void get_contacts_xp() {
@@ -374,19 +337,6 @@ void get_configuration(int step, std::string name, int thread_num) {
     fn_old << dir << output_folder << "/" << "Configurations/configuration_" << name << "_" << step - 1 << "_" << thread_num << ".txt";
     std::remove(fn_old.str().c_str());
 }
-
-//void get_energies_file(const int& steps) {  //saves energies as vector
-//	std::ostringstream fn;
-//	fn << dir << "int_E_" << steps << ".txt";
-//	std::ofstream final_energies;
-//	final_energies.open(fn.str().c_str(), std::ios_base::binary);
-//	for (int i = 0; i < pol_length; i++) {
-//		for (int j = 0; j < pol_length; j++) {
-//			final_energies << Interaction_E[i][j] << '\n';
-//		}
-//	}
-//    final_energies.close();
-//}
 
 void get_alpha_beta(int step) {
     std::ostringstream fn;
@@ -662,5 +612,3 @@ void get_sim_params() {
     }
 
 }
-
-
