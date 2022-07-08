@@ -30,19 +30,6 @@ struct vec_hash {
     }
 };
 
-//struct pair_hash {
-//	std::size_t operator()(const std::pair<int, int>& pair) const noexcept {
-//		std::size_t seed = 0;
-//		boost::hash_combine(seed, pair.first);
-//		boost::hash_combine(seed, pair.second);
-//		return seed;
-//	}
-//};
-//struct vec_hash {
-//	std::size_t operator()(const std::vector<int> vec) const noexcept {
-//		return boost::hash_range(vec.cbegin(), vec.cend());
-//	}
-//};
 extern std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts;
 extern std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> locations;
 
@@ -146,7 +133,6 @@ extern std::vector<double> offset;
 extern std::vector<double> offset_z;
 extern bool constrain_pol;
 extern bool use_fork_distribution;
-//extern std::vector<int> space;
 
 extern std::vector<int> lin_length;
 extern const int oriC;
@@ -155,16 +141,5 @@ extern std::vector<int> gauss_lin_length;
 extern std::vector<std::vector< std::vector<double>>> total_contacts;
 extern std::vector< std::vector<double>> final_contacts;
 extern std::vector<std::vector<double>> xp_contacts;
-
-//extern std::uniform_real_distribution<double> unif;
-//extern std::uniform_int_distribution<int> unimove;
-//extern std::uniform_int_distribution<int> unisite;
-//
-//extern std::uniform_int_distribution<int> unidir;
-//extern std::uniform_int_distribution<int> unidir_loop;
-//extern std::uniform_int_distribution<int> unimove;
-//extern std::uniform_int_distribution<int> unimove2;
-//extern std::uniform_int_distribution<int> unipol;
-//extern std::uniform_int_distribution<int> unisite;
 
 #endif

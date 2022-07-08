@@ -33,31 +33,31 @@ bool constrain_pol = true; // constrains one origin to always be the closer one 
 
 /////////// fork distribution ///////////////
 int gaussian_width = 69; //GG: width of the fork distribution, would be better not to set it here, but to read in from somewhere
-bool use_fork_distribution = true; // load fork position distribution on top of the input data for a stage?
+bool use_fork_distribution = false; // load fork position distribution on top of the input data for a stage?
 //GG: When using fork distributions, instead of using alpha/beta energies, it's better to add OriC to "sites_constrained_mean/separation"
 //    This should work well for stages 0, 10, where in some threads Ori is replicated, in others not.
 //    With "include_replicated_in_mean = false" unreplicated Oris have constrained mean, while replicated Oris constrained separation.
 
 std::string fork_distribution_file = "flat_distribution";
-bool use_gaussian_weights = true;
+bool use_gaussian_weights = false;
 
 //std::string fork_distribution_file = "gaussian_distribution";
 //bool use_gaussian_weights = false;
 
 ///////// initial configurations ////////////
-bool initConfig = true;
+bool initConfig = false;
 std::string configuration_data_folder = "2021-11-24_2122_75/";
 int init_config_number = 80; //iteration number of the initial configuration used
 const int res{1000}; //JM: how often the mean positions are sampled
 
 ///////// initial energies //////////////
-bool initEnerg = true; //load initial energies?
+bool initEnerg = false; //load initial energies?
 std::string energy_data_folder = configuration_data_folder;
 std::string energy_data_iteration = std::to_string(init_config_number);
 
 ///////// input Hi-C data ////////////
-std::string dir = "/home/grzes/Desktop/chromosomes/inverse/";
-//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120455_Laublab_BglII_HiC_NA1000_cellcycle_0min_overlap_after_normalization_rotated.txt";
+std::string dir = "/home/janni/Code/Backward/";
+//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120455_Laublab_BglII_HiC_NA1000_cellcycle_0min_overlap_after_normalization_rotated_rescaked)t0.txt";
 //std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycle_10min_overlap_after_normalization_rotated_rescaled_t0.txt";
 //std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120457_Laublab_BglII_HiC_NA1000_cellcycle_30min_overlap_after_normalization_rotated_rescaled_t0.txt";
 //std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120458_Laublab_BglII_HiC_NA1000_cellcycle_45min_overlap_after_normalization_rotated_rescaled_t0.txt";
@@ -104,8 +104,6 @@ std::vector<std::vector<double>> gaussian_factors_separations(number_of_threads,
 std::vector<std::vector<double>> gaussian_factors_means(number_of_threads, std::vector<double>(n_constrained_mean, 1));
 std::vector<int> gauss_lin_length(number_of_threads, 0);
 
-//std::vector<int> space(number_of_threads,0);  // something like half the length of the cell, not exactly the half if there is an offset in the z direction
-
 /////// Set properties of randomly generated numbers ////////
 std::vector<RandomGenerator> generators;
 
@@ -116,9 +114,9 @@ std::vector<int> pole (number_of_threads,0);  // JM: stores the z value of the c
 
 /////// Experimental constraints ////////
 std::vector<double> xp_z_close(number_of_stages);// Experimental constraints [units of cell lenght]
-std::vector<double> xp_z_far(number_of_stages); // Experimental constraints
-std::vector<double> xp_z_close_var(number_of_stages); // Experimental constraints
-std::vector<double> xp_z_far_var(number_of_stages); // Experimental constraints
+std::vector<double> xp_z_far(number_of_stages);
+std::vector<double> xp_z_close_var(number_of_stages);
+std::vector<double> xp_z_far_var(number_of_stages);
 
 std::vector<double> xp_z_close_simunits(number_of_stages); // Constraints in the units of simulation lattice (needed for calculating variance energy)
 std::vector<double> xp_z_far_simunits(number_of_stages);
@@ -140,7 +138,7 @@ std::vector<double> z_close_squared_tot(number_of_stages,0);
 std::vector<double> z_far_squared_tot(number_of_stages,0);
 
 ////////// Interaction, position, separation ENERGIES ///////////
-std::vector<std::vector<double>> Interaction_E(pol_length, std::vector<double>(pol_length, 0));
+std::vector<std::vector<double>> Interaction_E(pol_length, std::vector<double>(bin_num, 0));
 
 std::vector<double> alpha(number_of_stages,0); // Energy close origin, for each stage of replication
 std::vector<double> beta(number_of_stages,0); // Energy far origin
@@ -163,10 +161,9 @@ std::vector<std::vector<Eigen::Vector3i>> lin_polymer(number_of_threads);
 
 std::vector<std::vector<bool>> is_replicated(number_of_threads, std::vector<bool>(pol_length, true)); // to have an easy check for which sites are replicated. Unreplicated are set to "false" in "initialization.h"
 
-std::vector<std::vector<double>> final_contacts(pol_length, std::vector<double>(pol_length, 0));
-std::vector<std::vector<std::vector<double>>> total_contacts(number_of_threads, std::vector< std::vector<double>>(pol_length, std::vector<double>(pol_length, 0))); // This stores the contact frequencies during the simulation
+std::vector<std::vector<double>> final_contacts(pol_length, std::vector<double>(bin_num, 0));
+std::vector<std::vector<std::vector<double>>> total_contacts(number_of_threads, std::vector< std::vector<double>>(bin_num, std::vector<double>(bin_num, 0))); // This stores the contact frequencies during the simulation
 std::vector<std::vector<double>> xp_contacts(bin_num, std::vector<double>(bin_num, 0));
-std::vector<std::vector<double>> fold_xp_contacts;
 
 /////// functions to be used later ///////
 
@@ -410,47 +407,43 @@ void run(int thread_num, int move_num) {
 
 void normalize() {
     double sum = 0;
-    std::vector<std::vector<double>> fold_contacts = fold(final_contacts);
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
             if (std::abs(i-j) > 1 && !(i==0 && j==bin_num - 1) && !(i==bin_num - 1 && j==0)) {
-                sum += fold_contacts[i][j];
+                sum += final_contacts[i][j];
             }
         }
     }
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
-            fold_contacts[i][j] *= float(bin_num) / sum;
+            final_contacts[i][j] *= float(bin_num) / sum;
         }
     }
-    final_contacts = unfold(fold_contacts);
 }
 
 void update_E(int step) {
-    std::vector<std::vector<double>> fold_energies = fold(Interaction_E);
-    std::vector<std::vector<double>> fold_contacts = fold(final_contacts);
-    for (int i = 0; i < bin_num; i++) {                 //update folded energy map
+    for (int i = 0; i < bin_num; i++) {                 //update energy map
         for (int j = 0; j < bin_num; j++) {
             if (std::abs(i-j) > 1 && !(i==0 && j==bin_num - 1) && !(i==bin_num - 1 && j==0)) {
                 auto comp = xp_contacts[i][j];
                 if (comp != 0) {
                     if (step>update_cap_onset) { //JM we impose an upper limit on the update after the first few stages, to facilitate convergence
-                        double prop_update = learning_rate * (fold_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
+                        double prop_update = learning_rate * (final_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
                         if (abs(prop_update)<update_cap_factor * learning_rate){
-                            fold_energies[i][j] +=prop_update;
+                            Interaction_E[i][j] +=prop_update;
                         }
                         else{
                             if (prop_update<0){
-                                fold_energies[i][j] -=update_cap_factor * learning_rate;
+                                Interaction_E[i][j] -=update_cap_factor * learning_rate;
                             }
                             else{
-                                fold_energies[i][j] +=update_cap_factor * learning_rate;
+                                Interaction_E[i][j] +=update_cap_factor * learning_rate;
                             }
                         }
                     }
                     else{
-                        fold_energies[i][j] +=
-                                learning_rate * (fold_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
+                        final_energies[i][j] +=
+                                learning_rate * (final_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
                     }
                 }
             }
@@ -462,7 +455,7 @@ void update_E(int step) {
         for (int j = 0; j < bin_num; j++) {
             if (std::abs(i-j) > 1 && !(i==0 && j==bin_num - 1) && !(i==bin_num - 1 && j==0)) {
                 auto comp = xp_contacts[i][j];
-                meanE += fold_energies[i][j] * comp;
+                meanE += Interaction_E[i][j] * comp;
                 sum += comp;
             }
         }
@@ -474,11 +467,10 @@ void update_E(int step) {
     for (int i = 0; i < bin_num; i++) {                 //set average energy to zero
         for (int j = 0; j < bin_num; j++) {
             if (std::abs(i-j) > 1 && !(i==0 && j==bin_num - 1) && !(i==bin_num - 1 && j==0)) {
-                fold_energies[i][j] -= meanE;
+                Interaction_E[i][j] -= meanE;
             }
         }
     }
-    Interaction_E = unfold(fold_energies);
 }
 
 void normalize_measured_z(){ // express measured values of z in the units of cell length, also shifts such that z=0 at the left pole
