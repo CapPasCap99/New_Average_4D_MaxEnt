@@ -9,7 +9,7 @@
 
 class RandomGenerator{
 public:
-    RandomGenerator(int seed, int len);
+    RandomGenerator(int seed, int len, int lin_len, int OriC);
     int unidir();
     int unidir_loop();
     int unimove();
