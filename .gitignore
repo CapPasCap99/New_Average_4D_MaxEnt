@@ -1,0 +1,9 @@
+CMakeLists.txt
+*.DS_Store
+2022-07-08_0920_10/
+CMakeCache.txt
+CMakeFiles/
+Input/
+Inverse_3D_new
+Makefile
+cmake_install.cmake
