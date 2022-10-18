@@ -7,6 +7,8 @@
 using namespace Eigen;
 
 void read_file(std::vector<std::vector<double>>& map, std::string& filename) {
+
+    std::cout<<"Reading in "<<filename<<std::endl;
     std::ifstream couplings;
     couplings.open(filename);
     if(couplings.fail()){throw std::invalid_argument( "Hi-C input file doesnt exist." );}
@@ -20,6 +22,7 @@ void read_file(std::vector<std::vector<double>>& map, std::string& filename) {
 
 void read_constraints(std::vector<double> &target_vector, std::string& filename){
     std::ifstream values;
+    std::cout<<"Reading in "<<filename<<std::endl;
     values.open(filename);
     for (int i =0;i<target_vector.size();i++){
         values>>target_vector[i];
@@ -29,6 +32,8 @@ void read_constraints(std::vector<double> &target_vector, std::string& filename)
 
 void read_interaction_energies(std::string& old_simulation_folder, std::string& iteration) {
     std::ifstream couplings;
+    
+    std::cout<<"Reading in "<<dir + old_simulation_folder + "Energies/energies_" + iteration + ".txt"<<std::endl;
     couplings.open(dir + old_simulation_folder + "Energies/energies_" + iteration + ".txt");  //read in energies
     if(couplings.fail()){throw std::invalid_argument( "Interaction energies input file doesnt exist." );}
     for (int i = 0; i < bin_num; i++) {
@@ -42,6 +47,7 @@ void read_interaction_energies(std::string& old_simulation_folder, std::string& 
 void check_input_energies_compatibility(std::string& old_simulation_folder, std::string& iteration){
     std::ifstream input_file;
     std::string word = " ";
+    std::cout<<"Reading in "<<dir + old_simulation_folder + "sim_params.txt"<<std::endl;
     input_file.open(dir + old_simulation_folder + "sim_params.txt");
     if(input_file.fail()){throw std::invalid_argument( "Input energy file doesnt exist (or sim_params.txt missing)." );}
     while(word != "Stages:"){
