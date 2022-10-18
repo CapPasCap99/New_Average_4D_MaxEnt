@@ -7,8 +7,8 @@
 #include "initialization.h"
 
 ////// Simulation properties //////
-const int number_of_threads = 600; //(must be divisible by number_of_stages)
-const std::vector<int> stages = {75}; // Crescentus stages: {0, 10, 30, 45, 60, 75}
+const int number_of_threads = 30; //(must be divisible by number_of_stages)
+const std::vector<int> stages = {10}; // Crescentus stages: {0, 10, 30, 45, 60, 75}
 //const std::vector<int> stages = {9, 11, 13, 14, 16, 18, 20, 21, 23, 25}; //Ecoli
 const int number_of_stages = stages.size(); //number of replication stages
 
@@ -25,7 +25,7 @@ double radius{ 3.2 }; // Crescentus
 //double radius{ 2.8 }; //Ecoli
 
 const int pol_length = reduction_factor*bin_num;
-const int mc_moves = 4e5;
+const int mc_moves = 4e6;
 const int burn_in_steps = 3e7;
 const int it_steps = 80; //JM: number of steps inverse algorithm
 bool boundary_cond = true;
@@ -45,26 +45,24 @@ bool use_gaussian_weights = false;
 //bool use_gaussian_weights = false;
 
 ///////// initial configurations ////////////
-bool initConfig = false;
-std::string configuration_data_folder = "2021-11-24_2122_75/";
+bool initConfig = true;
+std::string configuration_data_folder = "2022-07-08_0920_10/";
 int init_config_number = 80; //iteration number of the initial configuration used
 const int res{1000}; //JM: how often the mean positions are sampled
 
 ///////// initial energies //////////////
-bool initEnerg = false; //load initial energies?
+bool initEnerg =true; //load initial energies?
 std::string energy_data_folder = configuration_data_folder;
 std::string energy_data_iteration = std::to_string(init_config_number);
 
 ///////// input Hi-C data ////////////
 std::string dir = "/home/janni/Code/Backward/";
 //std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120455_Laublab_BglII_HiC_NA1000_cellcycle_0min_overlap_after_normalization_rotated_rescaked)t0.txt";
-//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycle_10min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120457_Laublab_BglII_HiC_NA1000_cellcycle_30min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120458_Laublab_BglII_HiC_NA1000_cellcycle_45min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120459_Laublab_BglII_HiC_NA1000_cellcycle_60min_overlap_after_normalization_rotated_rescaled_t0.txt";
-std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string dir = "/media/joris/raid_data/Chromosome_Maxent/4dchrom_crescentus/inverse/";
-//std::string HiC_file = "/media/joris/raid_data/Chromosome_Maxent/4dchrom_crescentus/Hi-C_time_crescentus/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated.txt";
+std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycle_10min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120457_Laublab_BglII_HiC_NA1000_cellcycle_30min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120458_Laublab_BglII_HiC_NA1000_cellcycle_45min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120459_Laublab_BglII_HiC_NA1000_cellcycle_60min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated_rescaled_t0.txt";
 
 ////// Learning rates //////
 double learning_rate{ 0.05 };
@@ -257,7 +255,7 @@ int main() {
 
     //Save the input parameters of the simulation in "sim_params.txt"//
     get_sim_params();
-
+    std::cout<<"Initialising..."<<std::endl;
     //Initialize configuraions//
     std::vector<std::thread> iniThreads(number_of_threads);
     for (auto l = 0; l < number_of_threads; l++) {
@@ -280,6 +278,7 @@ int main() {
     }
 
     auto start = std::chrono::high_resolution_clock::now();
+    std::cout<<"Burning in..."<<std::endl;
 
     //Burn in  configuraions//
     std::vector<std::thread> burnThreads(number_of_threads);
@@ -289,12 +288,11 @@ int main() {
     for (auto&& l : burnThreads) {
         l.join();
     }
+    std::cout<<"Start gradient descent..."<<std::endl;
 
     // Perform inverse algorithm //
     for (auto step = 0; step <= it_steps; step++) {
-
         //Forward run//
-
         //copying positioning energies from vectors to unordered maps (for convenience when calculating delta_E)
         for(int stage=0; stage<number_of_stages; stage++) {
             for (int i = 0; i < sites_constrained_mean.size(); i++) {
@@ -313,14 +311,14 @@ int main() {
             l.join();
         }
         for (int l = 0; l < number_of_threads; l++) {
-            for (int i = 0; i < pol_length; i++) {
-                for (int j = 0; j < pol_length; j++) {
+            for (int i = 0; i < bin_num; i++) {
+                for (int j = 0; j < bin_num; j++) {
                     final_contacts[i][j] += total_contacts[l][i][j]*gaussian_factors[l];
                 }
             }
         }
-        for (int i = 0; i < pol_length; i++) {
-            for (int j = 0; j < pol_length; j++) {
+        for (int i = 0; i < bin_num; i++) {
+            for (int j = 0; j < bin_num; j++) {
                 final_contacts[j][i] = final_contacts[i][j];
             }
         }
@@ -442,7 +440,7 @@ void update_E(int step) {
                         }
                     }
                     else{
-                        final_energies[i][j] +=
+                        Interaction_E[i][j] +=
                                 learning_rate * (final_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
                     }
                 }
@@ -717,7 +715,7 @@ void correct_gaussian_distribution_fully_replicated(){ // GG: assign equal weigh
 }
 
 void clean_up() {
-    std::vector<double> zeroVec(pol_length, 0);
+    std::vector<double> zeroVec(bin_num, 0);
     std::fill(final_contacts.begin(), final_contacts.end(), zeroVec);
     for (int l = 0; l < number_of_threads; l++) {
         std::fill(total_contacts[l].begin(), total_contacts[l].end(), zeroVec);
@@ -750,26 +748,28 @@ void clean_up() {
         contacts[l].clear();
         contacts_lin[l].clear();
         contacts_inter[l].clear();
-        for (int i = 0; i < pol_length; i++) {
+        for (int i = 0; i < pol_length; i+=reduction_factor) {
+	    int red_i=i/reduction_factor;
             if (locations[l].find({polymer[l][i][0], polymer[l][i][1], polymer[l][i][2]}) != locations[l].end()) {
                 for (auto elem : locations[l][{polymer[l][i][0], polymer[l][i][1],polymer[l][i][2]}]) {
-                    contacts[l][{std::min(elem, i), std::max(elem, i)}] = 0;
+                    contacts[l][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                 }
             }
             //locations[l][{polymer[l][i][0], polymer[l][i][1],polymer[l][i][2]}].push_back(i);
         }
-        for (int i = 0; i < pol_length; i++) {
+        for (int i = 0; i < pol_length; i+=reduction_factor) {
+	    int red_i=i/reduction_factor;
             if (oriC + lin_length[l%number_of_stages] >= pol_length) {
                 if (i > oriC - lin_length[l%number_of_stages] || i < (oriC + lin_length[l%number_of_stages]) % pol_length) {
                     if (locations_lin[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) != locations_lin[l].end()) {
                         for (auto elem : locations_lin[l][{lin_polymer[l][i][0],lin_polymer[l][i][1],lin_polymer[l][i][2]}]) {
-                            contacts_lin[l][{std::min(elem, i), std::max(elem, i)}] = 0;
+                            contacts_lin[l][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                         }
                     }
                     if (locations[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) !=
                         locations[l].end()) {
                         for (auto elem : locations[l][{lin_polymer[l][i][0],lin_polymer[l][i][1],lin_polymer[l][i][2]}]) {
-                            contacts_inter[l][{elem, i}] = 0;
+                            contacts_inter[l][{elem, red_i}] = 0;
                         }
                     }
                     //locations_lin[l][{lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}].push_back(i);
@@ -778,13 +778,13 @@ void clean_up() {
                 if (i > oriC - lin_length[l%number_of_stages] && i < oriC + lin_length[l%number_of_stages]) {
                     if (locations_lin[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) != locations_lin[l].end()) {
                         for (auto elem : locations_lin[l][{lin_polymer[l][i][0],lin_polymer[l][i][1],lin_polymer[l][i][2]}]) {
-                            contacts_lin[l][{std::min(elem, i), std::max(elem, i)}] = 0;
+                            contacts_lin[l][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                         }
                     }
                     if (locations[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) !=
                         locations[l].end()) {
                         for (auto elem : locations[l][{lin_polymer[l][i][0],lin_polymer[l][i][1],lin_polymer[l][i][2]}]) {
-                            contacts_inter[l][{elem, i}] = 0;
+                            contacts_inter[l][{elem, red_i}] = 0;
                         }
                     }
                     //locations_lin[l][{lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}].push_back(i);
