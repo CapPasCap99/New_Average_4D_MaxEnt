@@ -739,26 +739,19 @@ void clean_up() {
             z_separation_data_tot[l%number_of_stages][i] = 0;
         }
 
-        //z[l] = 0;
-        //z_lin[l] = 0;
-        //z_tot[l%number_of_stages]=0;
-        //z_lin_tot[l%number_of_stages]=0;
-        //locations[l].clear(); //JM: Not sure why this one has to be reset - doesn't it stay the same?
-        //locations_lin[l].clear(); //JM: Not sure why this one has to be reset - doesn't it stay the same?
         contacts[l].clear();
         contacts_lin[l].clear();
         contacts_inter[l].clear();
         for (int i = 0; i < pol_length; i+=reduction_factor) {
-	    int red_i=i/reduction_factor;
+            int red_i=i/reduction_factor;
             if (locations[l].find({polymer[l][i][0], polymer[l][i][1], polymer[l][i][2]}) != locations[l].end()) {
                 for (auto elem : locations[l][{polymer[l][i][0], polymer[l][i][1],polymer[l][i][2]}]) {
                     contacts[l][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
                 }
             }
-            //locations[l][{polymer[l][i][0], polymer[l][i][1],polymer[l][i][2]}].push_back(i);
         }
         for (int i = 0; i < pol_length; i+=reduction_factor) {
-	    int red_i=i/reduction_factor;
+            int red_i=i/reduction_factor;
             if (oriC + lin_length[l%number_of_stages] >= pol_length) {
                 if (i > oriC - lin_length[l%number_of_stages] || i < (oriC + lin_length[l%number_of_stages]) % pol_length) {
                     if (locations_lin[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) != locations_lin[l].end()) {
@@ -772,7 +765,6 @@ void clean_up() {
                             contacts_inter[l][{elem, red_i}] = 0;
                         }
                     }
-                    //locations_lin[l][{lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}].push_back(i);
                 }
             } else {
                 if (i > oriC - lin_length[l%number_of_stages] && i < oriC + lin_length[l%number_of_stages]) {
@@ -787,7 +779,6 @@ void clean_up() {
                             contacts_inter[l][{elem, red_i}] = 0;
                         }
                     }
-                    //locations_lin[l][{lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}].push_back(i);
                 }
             }
         }
