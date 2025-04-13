@@ -1,3 +1,35 @@
+"""
+Code accompanying the paper 'Learning the dynamic organization of a replicating bacterial chromosome from time-course Hi-C data' by Harju et al. (2025)
+Here, the energies of the MaxEnt model are obtained via iterative Monte Carlo simulations.
+
+The code is structured as follows:
+
+global.h
+- Initiation of global variables
+
+files.h
+- Reading of input files, with checks on correct data structures. 
+- Writing of output files.
+
+Initialization.h
+- Define starting set of polymer configurations, either via reading in saved configurations, or by default construction.
+- Configure polymer replication stage.
+- Burn in polymer configurations.
+
+RandomGenerator.h
+- Definition of the RandomGenerator class, used for random number generation during Monte Carlo simulations.
+
+moves.h
+- All polymer moves used during the Monte Carlo simulation, with supporting fuctions.
+
+energy_changes.h
+- Computation of energy changes associated with a Monte Carlo move.
+
+main.cpp
+- Setting of simulation parameters
+- Orchestration of iterative Monte Carlo simulation
+"""
+
 #include <thread>
 #include <chrono>
 #include <iomanip>
@@ -12,7 +44,7 @@ const std::vector<int> stages = {10}; // Crescentus stages: {0, 10, 30, 45, 60, 
 //const std::vector<int> stages = {9, 11, 13, 14, 16, 18, 20, 21, 23, 25}; //Ecoli
 const int number_of_stages = stages.size(); //number of replication stages
 
-const std::string bacteria_name = "crescentus_separations_3";
+const std::string bacteria_name = "crescentus_separations_3"; //Determines which input files will be used
 const int bin_num = 405; //Crescentus
 const int reduction_factor = 4; //Crescentus
 const int oriC = 1220; // Crescentus   //position of the origin of replication. Determines where replication is initiated.
@@ -32,6 +64,7 @@ bool boundary_cond = true;
 bool constrain_pol = true; // constrains one origin to always be the closer one to a cell pole
 
 /////////// fork distribution ///////////////
+// Not used in current implementation of the code. If use_fork_distribution = true, a distribution of replication fork positions is implemented.
 int gaussian_width = 69; //GG: width of the fork distribution, would be better not to set it here, but to read in from somewhere
 bool use_fork_distribution = false; // load fork position distribution on top of the input data for a stage?
 //GG: When using fork distributions, instead of using alpha/beta energies, it's better to add OriC to "sites_constrained_mean/separation"
@@ -560,6 +593,8 @@ void set_unconstrained_energies_to_zero() { //for safety: makes sure that the in
     }
 }
 
+// All 'gaussian' functions are not used in the current version of the code. 
+// These functions can be used to implement a Gaussian distribution of replication fork positions.
 void calculate_gaussian_factors_flat_distrib(){ //GG: dodaj tutaj factors_mean i drugą funkcję dla _gaussian
     int mean_fork_position = gauss_lin_length[number_of_threads/2]; //mean of the gaussian
 
