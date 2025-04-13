@@ -79,7 +79,7 @@ bool use_gaussian_weights = false;
 
 ///////// initial configurations ////////////
 bool initConfig = true;
-std::string configuration_data_folder = "2022-07-08_0920_10/";
+std::string configuration_data_folder = "configurations/";
 int init_config_number = 80; //iteration number of the initial configuration used
 const int res{1000}; //JM: how often the mean positions are sampled
 
@@ -89,13 +89,13 @@ std::string energy_data_folder = configuration_data_folder;
 std::string energy_data_iteration = std::to_string(init_config_number);
 
 ///////// input Hi-C data ////////////
-std::string dir = "/home/janni/Code/Backward/";
-//std::string HiC_file = dir + "Input/Hi-C_time_crescentus/GSM1120455_Laublab_BglII_HiC_NA1000_cellcycle_0min_overlap_after_normalization_rotated_rescaked)t0.txt";
-std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycle_10min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120457_Laublab_BglII_HiC_NA1000_cellcycle_30min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120458_Laublab_BglII_HiC_NA1000_cellcycle_45min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120459_Laublab_BglII_HiC_NA1000_cellcycle_60min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/crescentus_Hi-c/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated_rescaled_t0.txt";
+std::string dir = "/";
+//std::string HiC_file = dir + "Input/GSM1120455_Laublab_BglII_HiC_NA1000_cellcycle_0min_overlap_after_normalization_rotated_rescaled_t0.txt";
+std::string HiC_file = dir + "Input/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycle_10min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/GSM1120457_Laublab_BglII_HiC_NA1000_cellcycle_30min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/GSM1120458_Laublab_BglII_HiC_NA1000_cellcycle_45min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/GSM1120459_Laublab_BglII_HiC_NA1000_cellcycle_60min_overlap_after_normalization_rotated_rescaled_t0.txt";
+//std::string HiC_file = dir + "Input/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated_rescaled_t0.txt";
 
 ////// Learning rates //////
 double learning_rate{ 0.05 };
