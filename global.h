@@ -136,7 +136,6 @@ extern bool use_fork_distribution;
 
 extern std::vector<int> lin_length;
 extern const int oriC;
-extern std::vector<int> gauss_lin_length;
 
 extern std::vector<std::vector< std::vector<double>>> total_contacts;
 extern std::vector< std::vector<double>> final_contacts;

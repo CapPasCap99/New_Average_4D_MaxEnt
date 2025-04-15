@@ -20,7 +20,7 @@ RandomGenerator.h
 - Definition of the RandomGenerator class, used for random number generation during Monte Carlo simulations.
 
 moves.h
-- All polymer moves used during the Monte Carlo simulation, with supporting fuctions.
+- All polymer moves used during the Monte Carlo simulation, with supporting functions.
 
 energy_changes.h
 - Computation of energy changes associated with a Monte Carlo move.
@@ -62,20 +62,6 @@ const int burn_in_steps = 3e7;
 const int it_steps = 80; //JM: number of steps inverse algorithm
 bool boundary_cond = true;
 bool constrain_pol = true; // constrains one origin to always be the closer one to a cell pole
-
-/////////// fork distribution ///////////////
-// Not used in current implementation of the code. If use_fork_distribution = true, a distribution of replication fork positions is implemented.
-int gaussian_width = 69; //GG: width of the fork distribution, would be better not to set it here, but to read in from somewhere
-bool use_fork_distribution = false; // load fork position distribution on top of the input data for a stage?
-//GG: When using fork distributions, instead of using alpha/beta energies, it's better to add OriC to "sites_constrained_mean/separation"
-//    This should work well for stages 0, 10, where in some threads Ori is replicated, in others not.
-//    With "include_replicated_in_mean = false" unreplicated Oris have constrained mean, while replicated Oris constrained separation.
-
-std::string fork_distribution_file = "flat_distribution";
-bool use_gaussian_weights = false;
-
-//std::string fork_distribution_file = "gaussian_distribution";
-//bool use_gaussian_weights = false;
 
 ///////// initial configurations ////////////
 bool initConfig = true;
@@ -130,10 +116,6 @@ std::vector<double> length(number_of_threads, 0); // JM: cell lengths. Ecoli: 8-
 
 std::vector<double> offset {0.5,0.5}; //JM: offsets in x and y directions, determines the center of the cylinder
 std::vector<double> offset_z(number_of_threads, 0);
-std::vector<double> gaussian_factors(number_of_threads, 1);
-std::vector<std::vector<double>> gaussian_factors_separations(number_of_threads, std::vector<double>(n_constrained_separation, 1));
-std::vector<std::vector<double>> gaussian_factors_means(number_of_threads, std::vector<double>(n_constrained_mean, 1));
-std::vector<int> gauss_lin_length(number_of_threads, 0);
 
 /////// Set properties of randomly generated numbers ////////
 std::vector<RandomGenerator> generators;
@@ -205,10 +187,6 @@ void normalize_measured_z();
 void update_alpha_beta(int step);
 void update_energ_coeff_mean (int step);
 void update_energ_coeff_separation (int step);
-void calculate_gaussian_factors_flat_distrib();
-void calculate_gaussian_factors_gaussian_distrib();
-void correct_gaussian_distribution_len0();
-void correct_gaussian_distribution_fully_replicated();
 void clean_up();
 void set_unconstrained_energies_to_zero();
 
@@ -229,12 +207,6 @@ int main() {
     //Read in constraints//
     read_input_data();
     read_file(xp_contacts, HiC_file);
-
-    //Spread fork distribution
-    if(use_fork_distribution){
-        if(stages.size()>1){throw std::invalid_argument( "Can't use the fork distribution with more than one stage." );}
-        read_fork_distribution(fork_distribution_file);
-    }
 
     //Read in energies//
     if(initEnerg) {
@@ -298,18 +270,6 @@ int main() {
         l.join();
     }
 
-    // calculating gaussian factors
-    if(use_fork_distribution) {
-        if(use_gaussian_weights) {
-            calculate_gaussian_factors_flat_distrib();
-            correct_gaussian_distribution_len0();
-            correct_gaussian_distribution_fully_replicated();
-        }
-        else{
-            calculate_gaussian_factors_gaussian_distrib();
-        }
-    }
-
     auto start = std::chrono::high_resolution_clock::now();
     std::cout<<"Burning in..."<<std::endl;
 
@@ -346,7 +306,7 @@ int main() {
         for (int l = 0; l < number_of_threads; l++) {
             for (int i = 0; i < bin_num; i++) {
                 for (int j = 0; j < bin_num; j++) {
-                    final_contacts[i][j] += total_contacts[l][i][j]*gaussian_factors[l];
+                    final_contacts[i][j] += total_contacts[l][i][j];
                 }
             }
         }
@@ -365,21 +325,21 @@ int main() {
 
         for (int l=0; l < number_of_threads; l++) { //JM: calculation of average z coordinates & squares of both oris
             if (lin_length[l%number_of_stages]==0) {
-                z_close_tot[l%number_of_stages] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors[l];
-                z_close_squared_tot[l%number_of_stages] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors[l];
+                z_close_tot[l%number_of_stages] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_close_squared_tot[l%number_of_stages] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
             else {
-                z_close_tot[l%number_of_stages] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors[l];
-                z_far_tot[l%number_of_stages] += z_far[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors[l];
-                z_close_squared_tot[l%number_of_stages] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors[l];
-                z_far_squared_tot[l%number_of_stages] += z_far_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors[l];
+                z_close_tot[l%number_of_stages] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_far_tot[l%number_of_stages] += z_far[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_close_squared_tot[l%number_of_stages] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_far_squared_tot[l%number_of_stages] += z_far_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
             //calculating z_mean_data_tot and z_separation_data_tot
             for(int i=0; i<sites_constrained_mean.size(); i++){
-                z_mean_data_tot[l%number_of_stages][i] += z_mean_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors_means[l][i];
+                z_mean_data_tot[l%number_of_stages][i] += z_mean_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
             for(int i=0; i<sites_constrained_separation.size(); i++){
-                z_separation_data_tot[l%number_of_stages][i] += z_separation_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res*gaussian_factors_separations[l][i];
+                z_separation_data_tot[l%number_of_stages][i] += z_separation_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
 
         }
@@ -554,12 +514,7 @@ void update_energ_coeff_mean (int step) {
 void update_energ_coeff_separation (int step) {
     for(int stage=0; stage<number_of_stages; stage++) {
         for (int i = 0; i < sites_constrained_separation.size(); i++) {
-            if(use_fork_distribution){ //GG: added separately to make sure it doesn't mess with the no-distribution-setting.
-                if(is_constrained_separation[stage][i]){
-                    energ_coeff_separation[stage][i] += learning_rate_separations * (z_separation_data_tot[stage][i] - target_separations[stage][i]);
-                }
-            }
-            else if(is_replicated[stage][sites_constrained_separation[i]] && is_constrained_separation[stage][i]) {
+            if(is_replicated[stage][sites_constrained_separation[i]] && is_constrained_separation[stage][i]) {
                 energ_coeff_separation[stage][i] += learning_rate_separations * (z_separation_data_tot[stage][i] - target_separations[stage][i]);
             }
         }
@@ -588,162 +543,6 @@ void set_unconstrained_energies_to_zero() { //for safety: makes sure that the in
         for(int i=0; i<n_constrained_separation; i++) {
             if(!is_constrained_separation[s][i]){
                 energ_coeff_separation[s][i] = 0;
-            }
-        }
-    }
-}
-
-// All 'gaussian' functions are not used in the current version of the code. 
-// These functions can be used to implement a Gaussian distribution of replication fork positions.
-void calculate_gaussian_factors_flat_distrib(){ //GG: dodaj tutaj factors_mean i drugą funkcję dla _gaussian
-    int mean_fork_position = gauss_lin_length[number_of_threads/2]; //mean of the gaussian
-
-    for (int l = 0; l < number_of_threads; l++) {
-        gaussian_factors[l] = exp(-pow(mean_fork_position - gauss_lin_length[l], 2)/(2*pow(gaussian_width,2)));
-        for (int i = 0; i < n_constrained_separation; i++){
-            gaussian_factors_separations[l][i] = gaussian_factors[l];
-        }
-        for (int i = 0; i < n_constrained_mean; i++){
-            gaussian_factors_means[l][i] = gaussian_factors[l];
-        }
-    }
-    // gaussian factors for contacts (all threads included)
-    double gaussian_sum = 0;
-    for (int l = 0; l < number_of_threads; l++) {
-        gaussian_sum += gaussian_factors[l];
-    }
-    for (int l = 0; l < number_of_threads; l++) {
-        gaussian_factors[l] = gaussian_factors[l] / gaussian_sum * number_of_threads;
-        //GG: gaussian factors sum to "number_of_threads", as when all are ==1
-    }
-    // gaussian factors for separations (only threads for which site "sites_constrained_separation[i]" is replicated)
-    for (int i=0; i<n_constrained_separation; i++){
-        double gaussian_sum = 0;
-        for (int l = 0; l < number_of_threads; l++) {
-            if(is_replicated[l][sites_constrained_separation[i]]) {
-                gaussian_sum += gaussian_factors_separations[l][i];
-            }
-        }
-        for (int l = 0; l < number_of_threads; l++) {
-            if(is_replicated[l][sites_constrained_separation[i]]) {
-                gaussian_factors_separations[l][i] = gaussian_factors_separations[l][i] / gaussian_sum * number_of_threads;
-                //GG: gaussian factors sum to "number_of_threads", as when all are ==1
-            }
-            else{
-                gaussian_factors_separations[l][i] = 0;
-            }
-        }
-    }
-    // gaussian factors for means (only threads for which site "sites_constrained_mean[i]" is not replicated, or all threads if include_replicated_in_mean)
-    for (int i=0; i<n_constrained_mean; i++){
-        double gaussian_sum = 0;
-        for (int l = 0; l < number_of_threads; l++) {
-            if(not is_replicated[l][sites_constrained_mean[i]]) {
-                gaussian_sum += gaussian_factors_means[l][i];
-            }
-        }
-        for (int l = 0; l < number_of_threads; l++) {
-            if(include_replicated_in_mean){ // include all threads if include_replicated_in_mean
-                gaussian_factors_means[l][i] = gaussian_factors[l];
-            }
-            else if(not is_replicated[l][sites_constrained_mean[i]]) {
-                gaussian_factors_means[l][i] = gaussian_factors_means[l][i] / gaussian_sum * number_of_threads;
-                //GG: gaussian factors sum to "number_of_threads", as when all are ==1
-            }
-            else{
-                gaussian_factors_means[l][i] = 0;
-            }
-        }
-    }
-}
-
-void calculate_gaussian_factors_gaussian_distrib() {
-    // gaussian factors for means
-    if (not include_replicated_in_mean) {
-        for (int i = 0; i < n_constrained_mean; i++) {
-            double gaussian_sum = 0;
-            for (int l = 0; l < number_of_threads; l++) {
-                if(not is_replicated[l][sites_constrained_mean[i]]){
-                    gaussian_sum += 1;
-                }
-            }
-            for (int l = 0; l < number_of_threads; l++) {
-                if(not is_replicated[l][sites_constrained_mean[i]]){
-                    gaussian_factors_means[l][i] = number_of_threads / gaussian_sum;
-                }
-                else{
-                    gaussian_factors_means[l][i] = 0;
-                }
-            }
-        }
-    }
-    // gaussian factors for separations
-    for (int i = 0; i < n_constrained_separation; i++) {
-        double gaussian_sum = 0;
-        for (int l = 0; l < number_of_threads; l++) {
-            if(is_replicated[l][sites_constrained_separation[i]]){
-                gaussian_sum += 1;
-            }
-        }
-        for (int l = 0; l < number_of_threads; l++) {
-            if(is_replicated[l][sites_constrained_separation[i]]){
-                gaussian_factors_separations[l][i] = number_of_threads / gaussian_sum;
-            }
-            else{
-                gaussian_factors_separations[l][i] = 0;
-            }
-        }
-    }
-}
-
-void correct_gaussian_distribution_len0(){ // GG: assign equal weights to all threads with lin_length = 0
-    double sum_contacts = 0;
-    std::vector<double> sum_means(n_constrained_mean, 0);
-    int counter = 0;
-    for (int l=0; l<number_of_threads; l++){
-        if(lin_length[l]==0){
-            sum_contacts += gaussian_factors[l];
-            for (int i=0; i<n_constrained_mean; i++){
-                sum_means[i] += gaussian_factors_means[l][i];
-            }
-            counter++;
-        }
-    }
-    for (int l=0; l<number_of_threads; l++){
-        if(lin_length[l]==0){
-            gaussian_factors[l] = sum_contacts / counter;
-            for (int i=0; i<n_constrained_mean; i++){
-                gaussian_factors_means[l][i] = sum_means[i] / counter;
-            }
-        }
-    }
-}
-
-void correct_gaussian_distribution_fully_replicated(){ // GG: assign equal weights to all threads with fully replicated chromosome
-    double sum_contacts = 0;
-    std::vector<double> sum_means(n_constrained_mean, 0);
-    std::vector<double> sum_separations(n_constrained_mean, 0);
-    int counter = 0;
-    for (int l=0; l<number_of_threads; l++){
-        if(lin_length[l] > pol_length/2){
-            sum_contacts += gaussian_factors[l];
-            for (int i=0; i<n_constrained_mean; i++){
-                sum_means[i] += gaussian_factors_means[l][i];
-            }
-            for (int i=0; i<n_constrained_separation; i++){
-                sum_separations[i] += gaussian_factors_separations[l][i];
-            }
-            counter++;
-        }
-    }
-    for (int l=0; l<number_of_threads; l++){
-        if(lin_length[l] > pol_length/2){
-            gaussian_factors[l] = sum_contacts / counter;
-            for (int i=0; i<n_constrained_mean; i++){
-                gaussian_factors_means[l][i] = sum_means[i] / counter;
-            }
-            for (int i=0; i<n_constrained_mean; i++){
-                gaussian_factors_separations[l][i] = sum_separations[i] / counter;
             }
         }
     }

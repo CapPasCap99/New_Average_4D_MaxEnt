@@ -255,7 +255,6 @@ void read_fork_distribution(std::string fork_distribution_file){
         }
         for(int i=0; i<multiplicity; i++){
             if(counter==number_of_threads){ throw std::invalid_argument( "Fork distribution doesn't match the thread number!"); }
-            gauss_lin_length[counter] = fork_pos;
             lin_length[counter] = std::max(fork_pos, 0);
             counter++;
         }
