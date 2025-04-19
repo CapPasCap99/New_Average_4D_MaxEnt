@@ -6,7 +6,6 @@
 #include <Eigen/Dense>
 #include <unordered_map>
 #include <vector>
-//#include "boost/functional/hash.hpp"
 
 template <typename T> void hash_combine(std::size_t& seed, const T& v) {
     seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -37,7 +36,6 @@ extern std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> cont
 extern std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts_lin;
 extern std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> locations_lin;
 
-//extern std::mt19937_64 gen;
 extern const int number_of_threads;
 extern std::vector<RandomGenerator> generators;
 extern const std::vector<int> stages;

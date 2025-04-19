@@ -96,7 +96,6 @@ int update_cap_onset {5};
 
 /////// positional constraints ///////
 
-//const int onset_ori_constraint = 0; //Stage from which the ori constraints are imposed
 std::vector<int> sites_constrained_mean = {oriC}; //sites for which constraints on mean are imposed
 std::vector<int> sites_constrained_separation = {oriC}; //sites for which constraints on separation are imposed
 const int n_constrained_mean = sites_constrained_mean.size();
@@ -109,7 +108,7 @@ bool include_replicated_in_mean = false; //GG: include (z1+z2)/2 as contribution
 std::vector<std::vector<bool>> is_constrained_ori(number_of_stages, std::vector<bool>(4, false));
 std::vector<std::vector<bool>> is_constrained_mean(number_of_stages, std::vector<bool>(n_constrained_mean, false));
 std::vector<std::vector<bool>> is_constrained_separation(number_of_stages, std::vector<bool>(n_constrained_separation, false));
-//GG: CHANGE ABOVE NoS TO NoT?
+
 /////// cellular properties ///////
 std::vector<int> lin_length(number_of_threads, 0); //  progress of the replication forks at either of the two chromosome arms. If the value is above the bin number, replication is at 100% //JM: not clear what values larger than the number of bins imply, i.e. does it matter how much above the bin number it is?
 std::vector<double> length(number_of_threads, 0); // JM: cell lengths. Ecoli: 8-21
@@ -179,7 +178,6 @@ std::vector<std::vector<std::vector<double>>> total_contacts(number_of_threads, 
 std::vector<std::vector<double>> xp_contacts(bin_num, std::vector<double>(bin_num, 0));
 
 /////// functions to be used later ///////
-
 void run(int thread_num, int move_num);
 void normalize();
 void update_E(int step);

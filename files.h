@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <iomanip>
 #include "global.h"
-//std::string directory = "C:\\Users\\lucas\\Desktop\\";
 using namespace Eigen;
 
 void read_file(std::vector<std::vector<double>>& map, std::string& filename) {
@@ -147,7 +146,6 @@ void read_configuration(std::string name, int thread_num, int step) {
     monomers.open(filename.str());  //read in monomer positions
     if(monomers.fail()){throw std::invalid_argument( "configuration input file doesnt exist" );}
 
-//    std::vector<Eigen::Vector3i> vec(pol_length,Eigen::Vector3i{0,0,0});
     if (name == "ring") {
         for (int i = 0; i < pol_length; i++) {
             Vector3i location = {0,0,0};
@@ -268,12 +266,6 @@ void get_energies_plot(const int& steps) { //saves energies as matrix
     fn << dir << output_folder << "/" << "Energies/energies_" << steps << ".txt";
     std::ofstream final_energies;
     final_energies.open(fn.str().c_str(), std::ios_base::binary);
-//    for (int i = 0; i < pol_length; i++) {
-//        for (int j = 0; j < pol_length; j++) {
-//            std::cout <<Interaction_E[i][j] << " ";
-//        }
-//        std::cout << std::endl;
-//    }
 
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
@@ -532,13 +524,6 @@ void get_sim_params() {
         if(not use_fork_distribution and s==number_of_stages-1){break;}
     }
     params << '\n';
-
-    //GG: pole-mid/space seems to be useless...
-//    params << std::setw(13) << "pole-mid: ";
-//    for (auto el: space) {
-//        params << std::setw(3) << el << " ";
-//    }
-//    params << '\n';
 
     params <<'\n';
     params <<"Constraints on the ori:";
