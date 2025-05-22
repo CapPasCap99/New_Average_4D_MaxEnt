@@ -44,6 +44,17 @@ const std::vector<int> stages = {10}; // Crescentus stages: {0, 10, 30, 45, 60, 
 //const std::vector<int> stages = {9, 11, 13, 14, 16, 18, 20, 21, 23, 25}; //Ecoli
 const int number_of_stages = stages.size(); //number of replication stages
 
+// //CB: CHANGE "continuous stages": 
+// const int stage_count = bin_num / 2;
+// std::vector<int> stages(stage_count);
+// std::iota(stages.begin(), stages.end(), 0);  // fork lengths: 0 to bin_num/2 - 1
+// const int number_of_stages = stage_count;
+
+// const int replicates_per_stage = 30;
+// const int total_simulations = stage_count * replicates_per_stage;
+
+
+
 const std::string bacteria_name = "crescentus_separations_3"; //Determines which input files will be used
 const int bin_num = 405; //Crescentus
 const int reduction_factor = 4; //Crescentus
@@ -84,20 +95,21 @@ std::string HiC_file = dir + "Input/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycl
 //std::string HiC_file = dir + "Input/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated_rescaled_t0.txt";
 
 ////// Learning rates //////
-double learning_rate{ 0.05 };
+// Why so many learning rates?? //
+double learning_rate{ 0.05 }; // contacts updating (used)
 double learning_rate_close { 0 };
 double learning_rate_far { 0 };
 double learning_rate_close_var { 0 };
 double learning_rate_far_var { 0 };
 double learning_rate_means { 0.5 };
-double learning_rate_separations { 0.5 };
+double learning_rate_separations { 0.5 }; //for ori-ori distance (used)
 double update_cap_factor {0.1};
 int update_cap_onset {5};
 
 /////// positional constraints ///////
-
-std::vector<int> sites_constrained_mean = {oriC}; //sites for which constraints on mean are imposed
-std::vector<int> sites_constrained_separation = {oriC}; //sites for which constraints on separation are imposed
+// The only constrained sites are the Oris right? //
+std::vector<int> sites_constrained_mean = {oriC}; //sites for which constraints on mean are imposed. mean of what ?
+std::vector<int> sites_constrained_separation = {oriC}; //sites for which constraints on separation are imposed. what separation ?
 const int n_constrained_mean = sites_constrained_mean.size();
 const int n_constrained_separation = sites_constrained_separation.size();
 std::unordered_map<int, int> sites_constrained_mean_map; // GG: keeps index of a site in the "sites_constrained_mean" list
@@ -111,6 +123,18 @@ std::vector<std::vector<bool>> is_constrained_separation(number_of_stages, std::
 
 /////// cellular properties ///////
 std::vector<int> lin_length(number_of_threads, 0); //  progress of the replication forks at either of the two chromosome arms. If the value is above the bin number, replication is at 100% //JM: not clear what values larger than the number of bins imply, i.e. does it matter how much above the bin number it is?
+
+//CB CHANGE : 
+//std::vector<int> lin_length(total_simulations);
+//for (int i = 0; i < stage_count; i++) {
+//    for (int r = 0; r < replicates_per_stage; r++) {
+//        lin_length[i * replicates_per_stage + r] = stages[i];
+//    }
+//}
+
+
+
+
 std::vector<double> length(number_of_threads, 0); // JM: cell lengths. Ecoli: 8-21
 
 std::vector<double> offset {0.5,0.5}; //JM: offsets in x and y directions, determines the center of the cylinder
@@ -125,7 +149,7 @@ std::string output_folder;
 std::vector<int> pole (number_of_threads,0);  // JM: stores the z value of the close cell pole, redundant in the current implementation because always the same
 
 /////// Experimental constraints ////////
-std::vector<double> xp_z_close(number_of_stages);// Experimental constraints [units of cell lenght]
+std::vector<double> xp_z_close(number_of_stages);// Experimental constraints [units of cell length]
 std::vector<double> xp_z_far(number_of_stages);
 std::vector<double> xp_z_close_var(number_of_stages);
 std::vector<double> xp_z_far_var(number_of_stages);
@@ -144,10 +168,23 @@ std::vector<double> z_far_squared(number_of_threads,0);
 std::vector<double> z_close_var(number_of_threads,0);
 std::vector<double> z_far_var(number_of_threads,0);
 
+//CB change:
+//std::vector<double> z_close(total_simulations,0);
+//std::vector<double> z_far(total_simulations,0);
+//std::vector<double> z_close_squared(total_simulations,0);
+//std::vector<double> z_far_squared(total_simulations,0);
+//std::vector<double> z_close_var(total_simulations,0);
+//std::vector<double> z_far_var(total_simulations,0);
+
 std::vector<double> z_close_tot(number_of_stages,0);
 std::vector<double> z_far_tot(number_of_stages,0);
 std::vector<double> z_close_squared_tot(number_of_stages,0);
 std::vector<double> z_far_squared_tot(number_of_stages,0);
+
+
+
+
+
 
 ////////// Interaction, position, separation ENERGIES ///////////
 std::vector<std::vector<double>> Interaction_E(pol_length, std::vector<double>(bin_num, 0));
@@ -245,7 +282,7 @@ int main() {
         generators.push_back( RandomGenerator(int(time_now) + i, pol_length, lin_length[i], oriC) );
     }
 
-    // set values offset_z //
+    // set values offset_z WHY??//
     for (int i=0; i<offset_z.size(); i++){ // setting z_offset to 0.5 for odd lengths
         offset_z[i] = (int(length[i]) % 2)/2.;
     }
@@ -259,7 +296,7 @@ int main() {
     //Save the input parameters of the simulation in "sim_params.txt"//
     get_sim_params();
     std::cout<<"Initialising..."<<std::endl;
-    //Initialize configuraions//
+    //Initialize configurations//
     std::vector<std::thread> iniThreads(number_of_threads);
     for (auto l = 0; l < number_of_threads; l++) {
         iniThreads[l] = std::thread(initialize, l,init_config_number);
@@ -271,7 +308,7 @@ int main() {
     auto start = std::chrono::high_resolution_clock::now();
     std::cout<<"Burning in..."<<std::endl;
 
-    //Burn in  configuraions//
+    //Burn in  configurations//
     std::vector<std::thread> burnThreads(number_of_threads);
     for (auto l = 0; l < number_of_threads; l++) {
         burnThreads[l] = std::thread(burn_in, l,burn_in_steps);
@@ -284,6 +321,7 @@ int main() {
     // Perform inverse algorithm //
     for (auto step = 0; step <= it_steps; step++) {
         //Forward run//
+
         //copying positioning energies from vectors to unordered maps (for convenience when calculating delta_E)
         for(int stage=0; stage<number_of_stages; stage++) {
             for (int i = 0; i < sites_constrained_mean.size(); i++) {
@@ -301,6 +339,20 @@ int main() {
         for (auto&& l : threads) {
             l.join();
         }
+
+        //CB CHANGE :
+        '''
+        for (int sim = 0; sim < total_simulations; sim += 30) {
+            std::vector<std::thread> threads;
+            for (int l = sim; l < std::min(sim + 30, total_simulations); l++) {
+                threads.emplace_back(run, l, std::round(mc_moves * sqrt(step+1)));
+            }
+            for (auto& t : threads) t.join();
+        }
+        '''
+
+
+        //After all threads finish, their contact maps (total_contacts) are summed into a global matrix final_contacts//
         for (int l = 0; l < number_of_threads; l++) {
             for (int i = 0; i < bin_num; i++) {
                 for (int j = 0; j < bin_num; j++) {
@@ -308,6 +360,28 @@ int main() {
                 }
             }
         }
+
+        //CB CHANGE :
+        '''
+        std::vector<double> w(stage_count, 1.0);  // or custom weights
+        double w_sum = std::accumulate(w.begin(), w.end(), 0.0);
+        for (auto& wi : w) wi /= w_sum;
+
+        for (int s = 0; s < stage_count; s++) {
+            double weight = w[s] / replicates_per_stage;
+            for (int r = 0; r < replicates_per_stage; r++) {
+                int idx = s * replicates_per_stage + r;
+                for (int i = 0; i < bin_num; i++) {
+                    for (int j = 0; j < bin_num; j++) {
+                        final_contacts[i][j] += weight * total_contacts[idx][i][j];
+                    }
+                }
+            }
+        }
+        '''
+
+
+        //Ensures final_contacts is symmetric//
         for (int i = 0; i < bin_num; i++) {
             for (int j = 0; j < bin_num; j++) {
                 final_contacts[j][i] = final_contacts[i][j];
@@ -318,6 +392,14 @@ int main() {
             get_configuration(step, "strand", l);
             get_configuration(step, "ring", l); //JM: Seems to save the configurations at the end of each iteration
         }
+
+        //CB Change :
+        '''
+        for (int l = 0; l < total_simulations; l++) {
+            get_configuration(step, "strand", l);
+            get_configuration(step, "ring", l);
+        }
+        '''
 
         //calculation of positional constraint values after forward run//
 
@@ -550,6 +632,8 @@ void clean_up() {
     std::vector<double> zeroVec(bin_num, 0);
     std::fill(final_contacts.begin(), final_contacts.end(), zeroVec);
     for (int l = 0; l < number_of_threads; l++) {
+    //CB change 
+    //for (int l = 0; l < total_simulations; l++) {
         std::fill(total_contacts[l].begin(), total_contacts[l].end(), zeroVec);
         z_close[l] = 0;
         z_far[l] = 0;
