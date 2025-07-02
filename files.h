@@ -167,98 +167,98 @@ void read_configuration(std::string name, int thread_num, int step) {
     monomers.close();
 }
 
-void read_input_data(){
-    std::ifstream input_file;
-    std::string word;
-    int site;
-    float exp_data;
-    for(int s=0; s<number_of_stages; s++) {
-        std::ostringstream filename;
-        filename << dir << "Input/" << bacteria_name << "/" << bacteria_name << "_stage_" << stages[s] << ".txt";
-        input_file.open(filename.str());
-        if(input_file.fail()){throw std::invalid_argument( "Missing input data for "+ bacteria_name + " at stage " + std::to_string(stages[s]) +"." );}
-        while (!input_file.eof()) {
-            input_file >> word;
-            if (word == "lin_length") {
-                input_file >> lin_length[s];
-            }
-            else if(word == "length"){
-                input_file >> length[s];
-            }
-            else if(word == "ori_pos_near"){
-                input_file >> xp_z_close[s];
-                is_constrained_ori[s][0] = true;
-            }
-            else if(word == "ori_pos_far"){
-                input_file >> xp_z_far[s];
-                is_constrained_ori[s][1] = true;
-            }
-            else if(word == "ori_var_near"){
-                input_file >> xp_z_close_var[s];
-                is_constrained_ori[s][2] = true;
-            }
-            else if(word == "ori_var_far"){
-                input_file >> xp_z_far_var[s];
-                is_constrained_ori[s][3] = true;
-            }
-            else if(word == "mean_positions"){
-                input_file >> word;
-                while(word != "end"){
-                    input_file >> site;
-                    input_file >> exp_data;
-                    if(sites_constrained_mean_map.find(site) != sites_constrained_mean_map.end() ){ //check if site constrained
-                        target_means[s][ sites_constrained_mean_map[site] ] = exp_data;
-                        is_constrained_mean[s][ sites_constrained_mean_map[site] ] = true;
-                    }
-                    input_file >> word;
-                }
-            }
-            else if(word == "mean_separations"){
-                input_file >> word;
-                while(word != "end"){
-                    input_file >> site;
-                    input_file >> exp_data;
-                    if(sites_constrained_separation_map.find(site) != sites_constrained_separation_map.end() ){ //check if site constrained
-                        target_separations[s][ sites_constrained_separation_map[site] ] = exp_data;
-                        is_constrained_separation[s][ sites_constrained_separation_map[site] ] = true;
-                    }
-                    input_file >> word;
-                }
-            }
-        }
-        input_file.close();
+// void read_input_data(){
+//     std::ifstream input_file;
+//     std::string word;
+//     int site;
+//     float exp_data;
+//     for(int s=0; s<number_of_stages; s++) {
+//         std::ostringstream filename;
+//         filename << dir << "Input/" << bacteria_name << "/" << bacteria_name << "_stage_" << stages[s] << ".txt";
+//         input_file.open(filename.str());
+//         if(input_file.fail()){throw std::invalid_argument( "Missing input data for "+ bacteria_name + " at stage " + std::to_string(stages[s]) +"." );}
+//         while (!input_file.eof()) {
+//             input_file >> word;
+//             if (word == "lin_length") {
+//                 input_file >> lin_length[s];
+//             }
+//             else if(word == "length"){
+//                 input_file >> length[s];
+//             }
+//             else if(word == "ori_pos_near"){
+//                 input_file >> xp_z_close[s];
+//                 is_constrained_ori[s][0] = true;
+//             }
+//             else if(word == "ori_pos_far"){
+//                 input_file >> xp_z_far[s];
+//                 is_constrained_ori[s][1] = true;
+//             }
+//             else if(word == "ori_var_near"){
+//                 input_file >> xp_z_close_var[s];
+//                 is_constrained_ori[s][2] = true;
+//             }
+//             else if(word == "ori_var_far"){
+//                 input_file >> xp_z_far_var[s];
+//                 is_constrained_ori[s][3] = true;
+//             }
+//             else if(word == "mean_positions"){
+//                 input_file >> word;
+//                 while(word != "end"){
+//                     input_file >> site;
+//                     input_file >> exp_data;
+//                     if(sites_constrained_mean_map.find(site) != sites_constrained_mean_map.end() ){ //check if site constrained
+//                         target_means[s][ sites_constrained_mean_map[site] ] = exp_data;
+//                         is_constrained_mean[s][ sites_constrained_mean_map[site] ] = true;
+//                     }
+//                     input_file >> word;
+//                 }
+//             }
+//             else if(word == "mean_separations"){
+//                 input_file >> word;
+//                 while(word != "end"){
+//                     input_file >> site;
+//                     input_file >> exp_data;
+//                     if(sites_constrained_separation_map.find(site) != sites_constrained_separation_map.end() ){ //check if site constrained
+//                         target_separations[s][ sites_constrained_separation_map[site] ] = exp_data;
+//                         is_constrained_separation[s][ sites_constrained_separation_map[site] ] = true;
+//                     }
+//                     input_file >> word;
+//                 }
+//             }
+//         }
+//         input_file.close();
 
-        // GG: extend vectors to length "number_of_threads" (needed for the distribution functions and maybe something else from the old forward code)
-        for(int i=0; i<number_of_threads; i++){
-            length[i] = length[i % number_of_stages];
-            lin_length[i] = lin_length[i % number_of_stages];
-        }
-    }
-}
+//         // // GG: extend vectors to length "number_of_threads" (needed for the distribution functions and maybe something else from the old forward code)
+//         // for(int i=0; i<number_of_threads; i++){
+//         //     length[i] = length[i % number_of_stages];
+//         //     lin_length[i] = lin_length[i % number_of_stages];
+//         // } //not with my logic (CB)
+//     }
+// }
 
 
-void read_fork_distribution(std::string fork_distribution_file){
-    std::ifstream input_file;
-    int multiplicity;
-    int fork_pos;
-    int counter = 0;
+// void read_fork_distribution(std::string fork_distribution_file){
+//     std::ifstream input_file;
+//     int multiplicity;
+//     int fork_pos;
+//     int counter = 0;
 
-    input_file.open( dir + "Input/fork_distributions/" + fork_distribution_file + "_stage_" + std::to_string(stages[0]) + ".txt" );
-    if(input_file.fail()){throw std::invalid_argument( "Missing fork distribution data for stage " + std::to_string(stages[0]) +"." );}
-    while (!input_file.eof()) {
-        input_file >> multiplicity;
-        input_file >> fork_pos;
-        if(multiplicity<0){
-            break;
-        }
-        for(int i=0; i<multiplicity; i++){
-            if(counter==number_of_threads){ throw std::invalid_argument( "Fork distribution doesn't match the thread number!"); }
-            lin_length[counter] = std::max(fork_pos, 0);
-            counter++;
-        }
-    }
-    if(counter<number_of_threads){ throw std::invalid_argument( "Fork distribution doesn't match the thread number!"); }
-}
+//     input_file.open( dir + "Input/fork_distributions/" + fork_distribution_file + "_stage_" + std::to_string(stages[0]) + ".txt" );
+//     if(input_file.fail()){throw std::invalid_argument( "Missing fork distribution data for stage " + std::to_string(stages[0]) +"." );}
+//     while (!input_file.eof()) {
+//         input_file >> multiplicity;
+//         input_file >> fork_pos;
+//         if(multiplicity<0){
+//             break;
+//         }
+//         for(int i=0; i<multiplicity; i++){
+//             if(counter==number_of_threads){ throw std::invalid_argument( "Fork distribution doesn't match the thread number!"); }
+//             lin_length[counter] = std::max(fork_pos, 0);
+//             counter++;
+//         }
+//     }
+//     if(counter<number_of_threads){ throw std::invalid_argument( "Fork distribution doesn't match the thread number!"); }
+// } // I am setting lin_length as a const. (CB)
 
 
 void get_energies_plot(const int& steps) { //saves energies as matrix
@@ -278,9 +278,9 @@ void get_energies_plot(const int& steps) { //saves energies as matrix
     final_energies.close();
 }
 
-void get_final_contacts(const int& step) {
+void get_final_contacts_averaged(const int& step) {
     std::ostringstream fn;
-    fn << dir << output_folder << "/" << "Contacts/contacts_" << step << ".txt";
+    fn << dir << output_folder << "/" << "Contacts/contacts_averaged" << step << ".txt";
     std::ofstream final_cont;
     final_cont.open(fn.str().c_str(), std::ios_base::binary); //write contact frequencies
     for (int i = 0; i < bin_num; i++) {
@@ -288,11 +288,31 @@ void get_final_contacts(const int& step) {
             double contact;
             if (std::abs(i-j) <= 1 || (i==0 && j == bin_num - 1) || (j==0 && i == bin_num - 1)) { contact = 0; }
             else {
-                contact = final_contacts[i][j];
+                contact = final_contacts_averaged[i][j];
             }
             final_cont << contact << ' ';
         }
         final_cont << '\n';
+    }
+}
+
+void get_final_contacts(const int& step) {
+    for (int s=0; s<number_of_stages;s++) {
+    std::ostringstream fn;
+    fn << dir << output_folder << "/" << "Contacts/contacts_stage" << s << "_and_step_" << step << ".txt";
+    std::ofstream final_cont;
+    final_cont.open(fn.str().c_str(), std::ios_base::binary); //write contact frequencies
+        for (int i = 0; i < bin_num; i++) {
+            for (int j = 0; j < bin_num; j++) {
+                double contact;
+                if (std::abs(i-j) <= 1 || (i==0 && j == bin_num - 1) || (j==0 && i == bin_num - 1)) { contact = 0; }
+                else {
+                    contact = final_contacts[s][i][j];
+                }
+                final_cont << contact << ' ';
+            }
+            final_cont << '\n';
+        }
     }
 }
 
@@ -519,9 +539,8 @@ void get_sim_params() {
     params << "offset: " << offset[0] << " "<< offset[1] << '\n';
     params << "oriC: " << oriC << '\n';
     params << "lin_lengths: ";
-    for (int s = 0; s < number_of_threads; s++) {
+    for (int s = 0; s < number_of_stages; s++) {
         params << std::setw(3) << lin_length[s] << " ";
-        if(not use_fork_distribution and s==number_of_stages-1){break;}
     }
     params << '\n';
 

@@ -1,34 +1,46 @@
-"""
-Code accompanying the paper 'Learning the dynamic organization of a replicating bacterial chromosome from time-course Hi-C data' by Harju et al. (2025)
-Here, the energies of the MaxEnt model are obtained via iterative Monte Carlo simulations.
+// """
+// Code accompanying the paper 'Learning the dynamic organization of a replicating bacterial chromosome from time-course Hi-C data' by Harju et al. (2025)
+// Here, the energies of the MaxEnt model are obtained via iterative Monte Carlo simulations.
 
-The code is structured as follows:
+// The code is structured as follows:
 
-global.h
-- Initiation of global variables
+// global.h
+// - Initiation of global variables
 
-files.h
-- Reading of input files, with checks on correct data structures. 
-- Writing of output files.
+// files.h
+// - Reading of input files, with checks on correct data structures. 
+// - Writing of output files.
 
-Initialization.h
-- Define starting set of polymer configurations, either via reading in saved configurations, or by default construction.
-- Configure polymer replication stage.
-- Burn in polymer configurations.
+// Initialization.h
+// - Define starting set of polymer configurations, either via reading in saved configurations, or by default construction.
+// - Configure polymer replication stage.
+// - Burn in polymer configurations.
 
-RandomGenerator.h
-- Definition of the RandomGenerator class, used for random number generation during Monte Carlo simulations.
+// RandomGenerator.h
+// - Definition of the RandomGenerator class, used for random number generation during Monte Carlo simulations.
 
-moves.h
-- All polymer moves used during the Monte Carlo simulation, with supporting functions.
+// moves.h
+// - All polymer moves used during the Monte Carlo simulation, with supporting functions.
 
-energy_changes.h
-- Computation of energy changes associated with a Monte Carlo move.
+// energy_changes.h
+// - Computation of energy changes associated with a Monte Carlo move.
 
-main.cpp
-- Setting of simulation parameters
-- Orchestration of iterative Monte Carlo simulation
-"""
+// main.cpp
+// - Setting of simulation parameters
+// - Orchestration of iterative Monte Carlo simulation
+
+// CHANGES TO THE 4D CODE:
+//  -Make lin_length and length number of stages long.
+//  -Previously, number_of_threads and number_of_stages were used interchangeably, now we make sure we use one or the other and convert from one to the other using replicates_per_stage.
+//  -Include number_of_threads>>number_of_threads_in_parallel
+//  -Instead of having :
+//         total_contacts(nb_threads,bin,bin)  --averaged over all threads-->  final_contacts(bin,bin)
+//         change to:
+//         total_contacts(nb_threads,bin,bin)  --averaged over replicates per stage-->  final_contacts(stage,bin,bin) --averaged over stages-->  final_contacts_averaged(bin,bin)
+//  -Average over the energies/contacts and compare with averaged out Hi-C map to update energies
+//  -Actually simulates all stages at once
+// """ 
+
 
 #include <thread>
 #include <chrono>
@@ -39,64 +51,56 @@ main.cpp
 #include "initialization.h"
 
 ////// Simulation properties //////
-const int number_of_threads = 30; //(must be divisible by number_of_stages)
-const std::vector<int> stages = {10}; // Crescentus stages: {0, 10, 30, 45, 60, 75}
-//const std::vector<int> stages = {9, 11, 13, 14, 16, 18, 20, 21, 23, 25}; //Ecoli
+const int number_of_threads_in_parallel = 48; 
+//const int number_of_threads = 2880; // Total number of simulations (must be divisible by number_of_stages)
+const int number_of_threads = 240; // Total number of simulations (must be divisible by number_of_stages)
+const std::vector<int> stages = {0, 10, 30, 45, 60, 75}; //C.Crescentus
 const int number_of_stages = stages.size(); //number of replication stages
-
-// //CB: CHANGE "continuous stages": 
-// const int stage_count = bin_num / 2;
-// std::vector<int> stages(stage_count);
-// std::iota(stages.begin(), stages.end(), 0);  // fork lengths: 0 to bin_num/2 - 1
-// const int number_of_stages = stage_count;
-
-// const int replicates_per_stage = 30;
-// const int total_simulations = stage_count * replicates_per_stage;
-
+const std::vector<int> lin_length = {0, 72, 292, 456, 624, 788}; //C.Crescentus number of replicated sites (physical ones)
+const std::vector<double> length = {18, 19, 22, 24, 28, 31}; //C.Crescentus cell length
+const int replicates_per_stage = number_of_threads / number_of_stages;
 
 
 const std::string bacteria_name = "crescentus_separations_3"; //Determines which input files will be used
 const int bin_num = 405; //Crescentus
 const int reduction_factor = 4; //Crescentus
-const int oriC = 1220; // Crescentus   //position of the origin of replication. Determines where replication is initiated.
+const int oriC = 0; // Crescentus   //position of the origin of replication. Determines where replication is initiated.
 double radius{ 3.2 }; // Crescentus
 
-//const std::string bacteria_name = "ecoli_meanorionly_new";
-//const int bin_num = 232; //Ecoli
-//const int reduction_factor = 2; //Ecoli
-//const int oriC = 392; // Ecoli
-//double radius{ 2.8 }; //Ecoli
 
 const int pol_length = reduction_factor*bin_num;
 const int mc_moves = 4e6;
 const int burn_in_steps = 3e7;
-const int it_steps = 80; //JM: number of steps inverse algorithm
+//const int it_steps = 60; //JM: number of steps inverse algorithm
+const int it_steps = 10;
 bool boundary_cond = true;
 bool constrain_pol = true; // constrains one origin to always be the closer one to a cell pole
 
 ///////// initial configurations ////////////
-bool initConfig = true;
+bool initConfig = false;
 std::string configuration_data_folder = "configurations/";
-int init_config_number = 80; //iteration number of the initial configuration used
+//int init_config_number = 60; //iteration number of the initial configuration used
+int init_config_number = 10; //iteration number of the initial configuration used
 const int res{1000}; //JM: how often the mean positions are sampled
 
 ///////// initial energies //////////////
-bool initEnerg =true; //load initial energies?
+bool initEnerg =false; //load initial energies?
 std::string energy_data_folder = configuration_data_folder;
 std::string energy_data_iteration = std::to_string(init_config_number);
 
 ///////// input Hi-C data ////////////
-std::string dir = "/";
-//std::string HiC_file = dir + "Input/GSM1120455_Laublab_BglII_HiC_NA1000_cellcycle_0min_overlap_after_normalization_rotated_rescaled_t0.txt";
-std::string HiC_file = dir + "Input/GSM1120456_Laublab_BglII_HiC_NA1000_cellcycle_10min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/GSM1120457_Laublab_BglII_HiC_NA1000_cellcycle_30min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/GSM1120458_Laublab_BglII_HiC_NA1000_cellcycle_45min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/GSM1120459_Laublab_BglII_HiC_NA1000_cellcycle_60min_overlap_after_normalization_rotated_rescaled_t0.txt";
-//std::string HiC_file = dir + "Input/GSM1120460_Laublab_BglII_HiC_NA1000_cellcycle_75min_overlap_after_normalization_rotated_rescaled_t0.txt";
+std::string dir = "/home/capucine/Documents/test/4D/HiC_data/averaged_normalized/";
+std::string HiC_file = dir + "t_averaged_normalized_array_thesecond.txt";
+
 
 ////// Learning rates //////
 // Why so many learning rates?? //
-double learning_rate{ 0.05 }; // contacts updating (used)
+double learning_rate{ 0.5 }; // contacts updating (used) the 1st
+//double learning_rate{ 0.2 }; // contacts updating (used) the 2nd
+//double learning_rate{ 0.1 }; // contacts updating (used) the 3rd
+//double learning_rate{ 0.05 }; // contacts updating (used) the 4th
+//double learning_rate{ 0.02 }; // contacts updating (used) the 5th
+
 double learning_rate_close { 0 };
 double learning_rate_far { 0 };
 double learning_rate_close_var { 0 };
@@ -108,8 +112,8 @@ int update_cap_onset {5};
 
 /////// positional constraints ///////
 // The only constrained sites are the Oris right? //
-std::vector<int> sites_constrained_mean = {oriC}; //sites for which constraints on mean are imposed. mean of what ?
-std::vector<int> sites_constrained_separation = {oriC}; //sites for which constraints on separation are imposed. what separation ?
+std::vector<int> sites_constrained_mean = {}; //sites for which constraints on mean are imposed. mean of what ?
+std::vector<int> sites_constrained_separation = {}; //sites for which constraints on separation are imposed. what separation ?
 const int n_constrained_mean = sites_constrained_mean.size();
 const int n_constrained_separation = sites_constrained_separation.size();
 std::unordered_map<int, int> sites_constrained_mean_map; // GG: keeps index of a site in the "sites_constrained_mean" list
@@ -122,20 +126,9 @@ std::vector<std::vector<bool>> is_constrained_mean(number_of_stages, std::vector
 std::vector<std::vector<bool>> is_constrained_separation(number_of_stages, std::vector<bool>(n_constrained_separation, false));
 
 /////// cellular properties ///////
-std::vector<int> lin_length(number_of_threads, 0); //  progress of the replication forks at either of the two chromosome arms. If the value is above the bin number, replication is at 100% //JM: not clear what values larger than the number of bins imply, i.e. does it matter how much above the bin number it is?
+//std::vector<int> lin_length(number_of_threads, 0); //  progress of the replication forks at either of the two chromosome arms. If the value is above the bin number, replication is at 100% //JM: not clear what values larger than the number of bins imply, i.e. does it matter how much above the bin number it is?
 
-//CB CHANGE : 
-//std::vector<int> lin_length(total_simulations);
-//for (int i = 0; i < stage_count; i++) {
-//    for (int r = 0; r < replicates_per_stage; r++) {
-//        lin_length[i * replicates_per_stage + r] = stages[i];
-//    }
-//}
-
-
-
-
-std::vector<double> length(number_of_threads, 0); // JM: cell lengths. Ecoli: 8-21
+//std::vector<double> length(number_of_threads, 0); // JM: cell lengths. Ecoli: 8-21
 
 std::vector<double> offset {0.5,0.5}; //JM: offsets in x and y directions, determines the center of the cylinder
 std::vector<double> offset_z(number_of_threads, 0);
@@ -210,7 +203,9 @@ std::vector<std::vector<Eigen::Vector3i>> lin_polymer(number_of_threads);
 
 std::vector<std::vector<bool>> is_replicated(number_of_threads, std::vector<bool>(pol_length, true)); // to have an easy check for which sites are replicated. Unreplicated are set to "false" in "initialization.h"
 
-std::vector<std::vector<double>> final_contacts(pol_length, std::vector<double>(bin_num, 0));
+
+std::vector<std::vector<double>> final_contacts_averaged(pol_length, std::vector<double>(bin_num, 0));
+std::vector<std::vector<std::vector<double>>> final_contacts(number_of_stages, std::vector< std::vector<double>>(bin_num, std::vector<double>(bin_num, 0))); // This stores the contact frequencies by stages during the simulation
 std::vector<std::vector<std::vector<double>>> total_contacts(number_of_threads, std::vector< std::vector<double>>(bin_num, std::vector<double>(bin_num, 0))); // This stores the contact frequencies during the simulation
 std::vector<std::vector<double>> xp_contacts(bin_num, std::vector<double>(bin_num, 0));
 
@@ -240,7 +235,7 @@ int main() {
     }
 
     //Read in constraints//
-    read_input_data();
+    //read_input_data(); NOPE. All the variables are added within the code !
     read_file(xp_contacts, HiC_file);
 
     //Read in energies//
@@ -263,28 +258,31 @@ int main() {
     char buffer [20];
     strftime(buffer, 20, "%Y-%m-%d_%H%M", now);
     std::string buffer_str = buffer; // converts to string
-    output_folder = buffer_str + "_" + std::to_string(stages[0]);
+    
+    for (int stage = 0; stage < number_of_stages; ++stage) {
+        std::string stage_folder = buffer_str + "_stage_" + std::to_string(stages[stage]);
+        std::string full_path = dir + stage_folder;
 
-    std::string command = "mkdir " + dir + output_folder;
-    std::system(command.c_str());
+        std::system(("mkdir -p " + full_path).c_str());
+        std::system(("mkdir -p " + full_path + "/Configurations").c_str());
+        std::system(("mkdir -p " + full_path + "/Contacts").c_str());
+        std::system(("mkdir -p " + full_path + "/Energies").c_str());
+        std::system(("mkdir -p " + full_path + "/Positions").c_str());
 
-    command = "mkdir " + dir + output_folder + "/Configurations";
-    std::system(command.c_str());
-    command = "mkdir " + dir + output_folder + "/Contacts";
-    std::system(command.c_str());
-    command = "mkdir " + dir + output_folder + "/Energies";
-    std::system(command.c_str());
-    command = "mkdir " + dir + output_folder + "/Positions";
-    std::system(command.c_str());
+    }
 
     // create and seed random generators //
-    for (int i=0; i<number_of_threads; i++){
-        generators.push_back( RandomGenerator(int(time_now) + i, pol_length, lin_length[i], oriC) );
+
+    for (int i = 0; i < number_of_threads; i++) {
+        int stage = i / replicates_per_stage; // Get the stage for this simulation
+        generators.push_back(RandomGenerator(int(time_now) + i, pol_length, lin_length[stage], oriC));
     }
+
 
     // set values offset_z WHY??//
     for (int i=0; i<offset_z.size(); i++){ // setting z_offset to 0.5 for odd lengths
-        offset_z[i] = (int(length[i]) % 2)/2.;
+        int stage = i / replicates_per_stage; // Get the stage for this simulation
+        offset_z[i] = (int(length[stage]) % 2)/2.;
     }
 
     // calculating ori position constraints in the units of simulation
@@ -293,28 +291,42 @@ int main() {
         xp_z_far_simunits[s] = xp_z_far[s]*(length[s] + 2*radius) - (length[s]/2 + radius - offset_z[s]);
     }
 
+    for (int i=0; i<number_of_threads; i++){
+        int stage = i / replicates_per_stage; // Get the stage for this simulation
+        xp_z_close_simunits[stage] = xp_z_close[stage]*(length[stage] + 2*radius) - (length[stage]/2 + radius - offset_z[i]);
+        xp_z_far_simunits[stage] = xp_z_far[stage]*(length[stage] + 2*radius) - (length[stage]/2 + radius - offset_z[i]);
+    }
+
     //Save the input parameters of the simulation in "sim_params.txt"//
     get_sim_params();
     std::cout<<"Initialising..."<<std::endl;
     //Initialize configurations//
-    std::vector<std::thread> iniThreads(number_of_threads);
-    for (auto l = 0; l < number_of_threads; l++) {
-        iniThreads[l] = std::thread(initialize, l,init_config_number);
-    }
-    for (auto&& l : iniThreads) {
-        l.join();
-    }
+    for (int i = 0; i < number_of_threads; i += number_of_threads_in_parallel) {
+        // Launch a batch of threads
+        int batch_size = std::min(number_of_threads_in_parallel, number_of_threads - i);
+        std::vector<std::thread> iniThreads(batch_size);
+        for (int j = 0; j < batch_size; ++j) {
+            iniThreads[j] = std::thread(initialize, i + j, init_config_number);
+        }
+        // Join all threads in this batch
+        for (auto& t : iniThreads) {
+            t.join();
+        }
+}
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout<<"Burning in..."<<std::endl;
 
-    //Burn in  configurations//
-    std::vector<std::thread> burnThreads(number_of_threads);
-    for (auto l = 0; l < number_of_threads; l++) {
-        burnThreads[l] = std::thread(burn_in, l,burn_in_steps);
-    }
-    for (auto&& l : burnThreads) {
-        l.join();
+    // Burn in configurations in parallel batches
+    for (int i = 0; i < number_of_threads; i += number_of_threads_in_parallel) {
+        int batch_size = std::min(number_of_threads_in_parallel, number_of_threads - i);
+        std::vector<std::thread> burnThreads(batch_size);
+        for (int j = 0; j < batch_size; ++j) {
+            burnThreads[j] = std::thread(burn_in, i + j, burn_in_steps);
+        }
+        for (auto& t : burnThreads) {
+            t.join();
+        }
     }
     std::cout<<"Start gradient descent..."<<std::endl;
 
@@ -340,51 +352,88 @@ int main() {
             l.join();
         }
 
-        //CB CHANGE :
-        '''
-        for (int sim = 0; sim < total_simulations; sim += 30) {
-            std::vector<std::thread> threads;
-            for (int l = sim; l < std::min(sim + 30, total_simulations); l++) {
-                threads.emplace_back(run, l, std::round(mc_moves * sqrt(step+1)));
-            }
-            for (auto& t : threads) t.join();
-        }
-        '''
+        // //std::vector<double> w = {1., 1., 1., 1., 0.9270073, 0.35766423}; //biological weights
+
+        // std::vector<double> w = {1., 1., 1., 1., 1., 1.}; //uniform weights
+        // double w_sum = std::accumulate(w.begin(), w.end(), 0.0);
+        // for (auto& wi : w) wi /= w_sum;  // Normalize to sum to 1
 
 
-        //After all threads finish, their contact maps (total_contacts) are summed into a global matrix final_contacts//
-        for (int l = 0; l < number_of_threads; l++) {
-            for (int i = 0; i < bin_num; i++) {
-                for (int j = 0; j < bin_num; j++) {
-                    final_contacts[i][j] += total_contacts[l][i][j];
-                }
-            }
-        }
+        // for (int s = 0; s < number_of_stages; s++) {
+        //     double weight = w[s] / replicates_per_stage;
+        //     for (int r = 0; r < replicates_per_stage; r++) {
+        //         int idx = s * replicates_per_stage + r;
+        //         for (int i = 0; i < bin_num; i++) {
+        //             for (int j = 0; j < bin_num; j++) {
+        //                 final_contacts[i][j] += weight * total_contacts[idx][i][j];
+        //             }
+        //         }
+        //     }
+        // } 
 
-        //CB CHANGE :
-        '''
-        std::vector<double> w(stage_count, 1.0);  // or custom weights
-        double w_sum = std::accumulate(w.begin(), w.end(), 0.0);
-        for (auto& wi : w) wi /= w_sum;
+        // //After all threads finish, their contact maps (total_contacts) are summed into a global matrix final_contacts//
+        // for (int l = 0; l < number_of_threads; l++) {
+        //     for (int i = 0; i < bin_num; i++) {
+        //         for (int j = 0; j < bin_num; j++) {
+        //             final_contacts[i][j] += total_contacts[l][i][j];
+        //         }
+        //     }
+        // }
 
-        for (int s = 0; s < stage_count; s++) {
-            double weight = w[s] / replicates_per_stage;
+
+        // Step 1: average over replicates per stage
+        for (int s = 0; s < number_of_stages; s++) {
             for (int r = 0; r < replicates_per_stage; r++) {
                 int idx = s * replicates_per_stage + r;
                 for (int i = 0; i < bin_num; i++) {
                     for (int j = 0; j < bin_num; j++) {
-                        final_contacts[i][j] += weight * total_contacts[idx][i][j];
+                        final_contacts[s][i][j] += total_contacts[idx][i][j];
                     }
                 }
             }
+            // Divide by number of replicates to get average per stage
+            for (int i = 0; i < bin_num; i++) {
+                for (int j = 0; j < bin_num; j++) {
+                    final_contacts[s][i][j] /= replicates_per_stage;
+                }
+            }
         }
-        '''
 
+        //std::vector<double> w = {1., 1., 1., 1., 0.9270073, 0.35766423}; // biological weights (prob not right)
+        std::vector<double> w = {1., 1., 1., 1., 1., 1.}; // uniform weights
+        double w_sum = std::accumulate(w.begin(), w.end(), 0.0);
+        for (auto& wi : w) wi /= w_sum; // Normalize to sum to 1
 
-        //Ensures final_contacts is symmetric//
+        // Step 2: weighted average over stages
+        for (int s = 0; s < number_of_stages; s++) {
+            for (int i = 0; i < bin_num; i++) {
+                for (int j = 0; j < bin_num; j++) {
+                    final_contacts_averaged[i][j] += w[s] * final_contacts[s][i][j];
+                }
+            }
+        }
+
+        // Divide to get mean over stages
         for (int i = 0; i < bin_num; i++) {
             for (int j = 0; j < bin_num; j++) {
-                final_contacts[j][i] = final_contacts[i][j];
+                final_contacts_averaged[i][j] /= number_of_stages;
+            }
+        }
+
+
+        //Ensures final_contacts_averaged is symmetric//
+        for (int i = 0; i < bin_num; i++) {
+            for (int j = 0; j < bin_num; j++) {
+                final_contacts_averaged[j][i] = final_contacts_averaged[i][j];
+            }
+        }
+
+        // Ensure final_contacts[stage] is symmetric for all stages
+        for (int s = 0; s < number_of_stages; s++) {
+            for (int i = 0; i < bin_num; i++) {
+                for (int j = 0; j < bin_num; j++) {
+                    final_contacts[s][j][i] = final_contacts[s][i][j];
+                }
             }
         }
 
@@ -393,13 +442,6 @@ int main() {
             get_configuration(step, "ring", l); //JM: Seems to save the configurations at the end of each iteration
         }
 
-        //CB Change :
-        '''
-        for (int l = 0; l < total_simulations; l++) {
-            get_configuration(step, "strand", l);
-            get_configuration(step, "ring", l);
-        }
-        '''
 
         //calculation of positional constraint values after forward run//
 
@@ -416,10 +458,10 @@ int main() {
             }
             //calculating z_mean_data_tot and z_separation_data_tot
             for(int i=0; i<sites_constrained_mean.size(); i++){
-                z_mean_data_tot[l%number_of_stages][i] += z_mean_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_mean_data_tot[number_of_stages][i] += z_mean_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
             for(int i=0; i<sites_constrained_separation.size(); i++){
-                z_separation_data_tot[l%number_of_stages][i] += z_separation_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_separation_data_tot[number_of_stages][i] += z_separation_data[l][i]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
 
         }
@@ -439,6 +481,7 @@ int main() {
 
         //save simulation parameters//
         get_final_contacts(step);
+        get_final_contacts_averaged(step);
         get_energ_coeff_mean(step);
         get_energ_coeff_separation(step);
         get_alpha_beta(step); //JM: Saves new values alpha and beta
@@ -481,15 +524,33 @@ void normalize() {
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
             if (std::abs(i-j) > 1 && !(i==0 && j==bin_num - 1) && !(i==bin_num - 1 && j==0)) {
-                sum += final_contacts[i][j];
+                sum += final_contacts_averaged[i][j];
             }
         }
     }
     for (int i = 0; i < bin_num; i++) {
         for (int j = 0; j < bin_num; j++) {
-            final_contacts[i][j] *= float(bin_num) / sum;
+            final_contacts_averaged[i][j] *= float(bin_num) / sum;
         }
     }
+
+    // Normalize final_contacts per stage
+    for (int s = 0; s < number_of_stages; s++) {
+        double sum_stage = 0;
+        for (int i = 0; i < bin_num; i++) {
+            for (int j = 0; j < bin_num; j++) {
+                if (std::abs(i - j) > 1 && !(i == 0 && j == bin_num - 1) && !(i == bin_num - 1 && j == 0)) {
+                    sum_stage += final_contacts[s][i][j];
+                }
+            }
+        }
+        for (int i = 0; i < bin_num; i++) {
+            for (int j = 0; j < bin_num; j++) {
+                final_contacts[s][i][j] *= float(bin_num) / sum_stage;
+            }
+        }
+    }
+
 }
 
 void update_E(int step) {
@@ -499,7 +560,7 @@ void update_E(int step) {
                 auto comp = xp_contacts[i][j];
                 if (comp != 0) {
                     if (step>update_cap_onset) { //JM we impose an upper limit on the update after the first few stages, to facilitate convergence
-                        double prop_update = learning_rate * (final_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
+                        double prop_update = learning_rate * (final_contacts_averaged[i][j] - comp) / pow(std::abs(comp), 0.5);
                         if (abs(prop_update)<update_cap_factor * learning_rate){
                             Interaction_E[i][j] +=prop_update;
                         }
@@ -514,7 +575,7 @@ void update_E(int step) {
                     }
                     else{
                         Interaction_E[i][j] +=
-                                learning_rate * (final_contacts[i][j] - comp) / pow(std::abs(comp), 0.5);
+                                learning_rate * (final_contacts_averaged[i][j] - comp) / pow(std::abs(comp), 0.5);
                     }
                 }
             }
@@ -630,29 +691,36 @@ void set_unconstrained_energies_to_zero() { //for safety: makes sure that the in
 
 void clean_up() {
     std::vector<double> zeroVec(bin_num, 0);
-    std::fill(final_contacts.begin(), final_contacts.end(), zeroVec);
+    std::fill(final_contacts_averaged.begin(), final_contacts_averaged.end(), zeroVec);
+    for (int s = 0; s < number_of_stages; s++) {
+        std::fill(final_contacts[s].begin(), final_contacts[s].end(), zeroVec);
+        z_close_var[s] = 0;
+        z_far_var[s] = 0;
+        z_close_squared_tot[s]=0;
+        z_far_squared_tot[s]=0;
+        z_close_tot[s]=0;
+        z_far_tot[s]=0;
+        for(int i=0; i<sites_constrained_mean.size(); i++){
+            z_mean_data_tot[s][i] = 0;
+        }
+        for(int i=0; i<sites_constrained_separation.size(); i++){
+            z_separation_data_tot[s][i] = 0;
+        }
+    }
+
     for (int l = 0; l < number_of_threads; l++) {
-    //CB change 
-    //for (int l = 0; l < total_simulations; l++) {
+        int stage = l / replicates_per_stage;
         std::fill(total_contacts[l].begin(), total_contacts[l].end(), zeroVec);
         z_close[l] = 0;
         z_far[l] = 0;
-        z_close_tot[l%number_of_stages]=0;
-        z_far_tot[l%number_of_stages]=0;
         z_close_squared[l] = 0;
         z_far_squared[l] = 0;
-        z_close_var[l%number_of_stages] = 0;
-        z_far_var[l%number_of_stages] = 0;
-        z_close_squared_tot[l%number_of_stages]=0;
-        z_far_squared_tot[l%number_of_stages]=0;
 
         for(int i=0; i<sites_constrained_mean.size(); i++){
             z_mean_data[l][i] = 0;
-            z_mean_data_tot[l%number_of_stages][i] = 0;
         }
         for(int i=0; i<sites_constrained_separation.size(); i++){
             z_separation_data[l][i] = 0;
-            z_separation_data_tot[l%number_of_stages][i] = 0;
         }
 
         contacts[l].clear();
@@ -668,8 +736,8 @@ void clean_up() {
         }
         for (int i = 0; i < pol_length; i+=reduction_factor) {
             int red_i=i/reduction_factor;
-            if (oriC + lin_length[l%number_of_stages] >= pol_length) {
-                if (i > oriC - lin_length[l%number_of_stages] || i < (oriC + lin_length[l%number_of_stages]) % pol_length) {
+            if (oriC + lin_length[stage] >= pol_length) {
+                if (i > oriC - lin_length[stage] || i < (oriC + lin_length[stage]) % pol_length) {
                     if (locations_lin[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) != locations_lin[l].end()) {
                         for (auto elem : locations_lin[l][{lin_polymer[l][i][0],lin_polymer[l][i][1],lin_polymer[l][i][2]}]) {
                             contacts_lin[l][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;
@@ -683,7 +751,7 @@ void clean_up() {
                     }
                 }
             } else {
-                if (i > oriC - lin_length[l%number_of_stages] && i < oriC + lin_length[l%number_of_stages]) {
+                if (i > oriC - lin_length[stage] && i < oriC + lin_length[stage]) {
                     if (locations_lin[l].find({lin_polymer[l][i][0], lin_polymer[l][i][1],lin_polymer[l][i][2]}) != locations_lin[l].end()) {
                         for (auto elem : locations_lin[l][{lin_polymer[l][i][0],lin_polymer[l][i][1],lin_polymer[l][i][2]}]) {
                             contacts_lin[l][{std::min(elem, red_i), std::max(elem, red_i)}] = 0;

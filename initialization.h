@@ -19,12 +19,14 @@ std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> lo
 
 
 void initialize(int thread_num, int step) {
-//    int stage = thread_num % number_of_stages;
-    int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
+//  int stage = thread_num % number_of_stages;
+//  int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
+    int stage = thread_num / replicates_per_stage;
+    
 
     // Set the values of is_replicated//
     for (int i = 0; i < pol_length; i++) {
-        if(lin_length[thread_num]==0){
+        if(lin_length[stage]==0){
             is_replicated[thread_num][i] = false;
             continue;
         }
@@ -160,7 +162,8 @@ void burn_in(int thread_num, int n_steps) {
         move(thread_num, m);
     }
 //    int stage = thread_num % number_of_stages;
-    int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
+//    int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
+    int stage = thread_num / replicates_per_stage;
 
     std::vector<double> zeroVec(bin_num, 0);
     std::fill(total_contacts[thread_num].begin(), total_contacts[thread_num].end(), zeroVec);

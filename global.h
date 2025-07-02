@@ -36,10 +36,12 @@ extern std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> cont
 extern std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts_lin;
 extern std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> locations_lin;
 
+extern const int number_of_threads_in_parallel;
 extern const int number_of_threads;
 extern std::vector<RandomGenerator> generators;
 extern const std::vector<int> stages;
 extern const int number_of_stages;
+extern const int replicates_per_stage;
 extern const int mc_moves;
 extern double learning_rate;
 extern double learning_rate_far;
@@ -123,7 +125,7 @@ extern std::vector<double> z_close_var;
 
 extern bool boundary_cond;
 extern double radius;
-extern std::vector<double> length;
+extern const std::vector<double> length;
 extern const int x_axis;
 extern const int y_axis;
 extern const int z_axis;
@@ -132,11 +134,14 @@ extern std::vector<double> offset_z;
 extern bool constrain_pol;
 extern bool use_fork_distribution;
 
-extern std::vector<int> lin_length;
+extern const std::vector<int> lin_length;
 extern const int oriC;
 
 extern std::vector<std::vector< std::vector<double>>> total_contacts;
-extern std::vector< std::vector<double>> final_contacts;
+extern std::vector<std::vector<std::vector<double>>> final_contacts;
+extern std::vector<std::vector<double>> final_contacts_averaged;
 extern std::vector<std::vector<double>> xp_contacts;
+
+extern std::vector<double> w;
 
 #endif
