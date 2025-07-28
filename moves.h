@@ -380,6 +380,9 @@ void loop_move_lin(int thread_num, int site, int &m, int lin_pol) {
 }
 
 void move(int thread_num, int &m) {
+    // if (thread_num>48){
+    //     std::cout << "[Move] Thread " << thread_num << ", Step " << m << std::endl;
+    // }
     int lin_pol = generators[thread_num].weightedpol(); //JH: prob proportional to replicated length
     //Pick site on linear or full chromosome:
     int site = (lin_pol==1) ? generators[thread_num].unisitelin() : generators[thread_num].unisitering();
@@ -388,14 +391,29 @@ void move(int thread_num, int &m) {
 //  int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
     int stage = thread_num / replicates_per_stage;
 
+    // if (thread_num>48){
+    //     std::cout << "[Move] Thread " << thread_num << ": lin_pol = " << lin_pol << ", site = " << site << std::endl;
+    // }
+
     int old_m = m; //to make sure that for m%100==0 the z-position data is not saved again when no step was made
     //JM it seems like the relative position of the site is calculated twice: once to decide the move, and once while performing the move. This can be done more efficiently...
     if (lin_length[stage] != 0) {
         if (lin_pol) { //picks linear polymer
+            // if (thread_num>48){
+            //     std::cout << "[Move] Thread " << thread_num << ": Linear polymer selected." << std::endl;
+            // }
             if (lin_length[stage] < pol_length/2) { //replicating chromosome
+                // if (thread_num>48){
+                //     std::cout << "[Move] Thread " << thread_num << ": Partial replication." << std::endl;
+                // }
                 if (oriC + lin_length[stage] >= pol_length + 3) { //JM: replication has passed zero coordinate, plus three?!
-                    if (site >= oriC - lin_length[stage] ||
-                        site <= (oriC + lin_length[stage] - 3) % pol_length) { //JM: Site is on the replicated portion of the linear polymer, and not at the junction site
+                    // if (thread_num>48){
+                    //     std::cout << "[Move] Thread " << thread_num << ": Passed oriC+lin_length >= pol_length+3 check." << std::endl;
+                    // }
+                    if (site >= oriC - lin_length[stage] || site <= (oriC + lin_length[stage] - 3) % pol_length) { //JM: Site is on the replicated portion of the linear polymer, and not at the junction site
+                        // if (thread_num>48){
+                        //     std::cout << "[Move] Thread " << thread_num << ": Main linear move branch." << std::endl;
+                        // }
                         int action = generators[thread_num].unimove();
                         if (action == 0) {
                             kink_move_lin(thread_num, site, m, lin_pol);
@@ -405,6 +423,9 @@ void move(int thread_num, int &m) {
                             loop_move_lin(thread_num, site, m, lin_pol);
                         }
                     } else if (site == (oriC + lin_length[stage] - 2) % pol_length) {
+                        // if (thread_num>48){
+                        //     std::cout << "[Move] Thread " << thread_num << ": Junction move branch." << std::endl;
+                        // }
                         int action2 = generators[thread_num].unimove2();
                         if (action2 == 0) {
                             kink_move_lin(thread_num, site, m, lin_pol);
@@ -414,6 +435,7 @@ void move(int thread_num, int &m) {
                     }
                 } else { //JM: replication has not passed the zero coordinate, plus three
                     if (site >= oriC - lin_length[stage] && site <= oriC + lin_length[stage] - 3) {//JM: site on the replicated portion of the linear polymer, and not at the junction site
+                        
                         int action = generators[thread_num].unimove();
                         if (action == 0) {
                             kink_move_lin(thread_num, site, m, lin_pol);
@@ -433,6 +455,9 @@ void move(int thread_num, int &m) {
                 }
             }
             else {  //fully replicated chromosome
+                // if (thread_num>48){
+                //     std::cout << "[Move] Thread " << thread_num << ": Ring polymer selected." << std::endl;
+                // }
                 int action = generators[thread_num].unimove();
                 if (action == 0) {
                     kink_move_lin(thread_num, site, m, lin_pol);
@@ -544,6 +569,10 @@ void move(int thread_num, int &m) {
             }
         }
     }
+    // if (thread_num>48){
+    //     std::cout << "[Move] Thread " << thread_num << " completed step " << m << std::endl;
+    // }
+
 }
 
 #endif

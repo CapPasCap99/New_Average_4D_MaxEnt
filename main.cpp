@@ -1,4 +1,4 @@
-// """
+//HALLOOO
 // Code accompanying the paper 'Learning the dynamic organization of a replicating bacterial chromosome from time-course Hi-C data' by Harju et al. (2025)
 // Here, the energies of the MaxEnt model are obtained via iterative Monte Carlo simulations.
 
@@ -39,7 +39,7 @@
 //         total_contacts(nb_threads,bin,bin)  --averaged over replicates per stage-->  final_contacts(stage,bin,bin) --averaged over stages-->  final_contacts_averaged(bin,bin)
 //  -Average over the energies/contacts and compare with averaged out Hi-C map to update energies
 //  -Actually simulates all stages at once
-// """ 
+
 
 
 #include <thread>
@@ -53,7 +53,7 @@
 ////// Simulation properties //////
 const int number_of_threads_in_parallel = 48; 
 //const int number_of_threads = 2880; // Total number of simulations (must be divisible by number_of_stages)
-const int number_of_threads = 240; // Total number of simulations (must be divisible by number_of_stages)
+const int number_of_threads = 96; // Total number of simulations (must be divisible by number_of_stages)
 const std::vector<int> stages = {0, 10, 30, 45, 60, 75}; //C.Crescentus
 const int number_of_stages = stages.size(); //number of replication stages
 const std::vector<int> lin_length = {0, 72, 292, 456, 624, 788}; //C.Crescentus number of replicated sites (physical ones)
@@ -137,7 +137,7 @@ std::vector<double> offset_z(number_of_threads, 0);
 std::vector<RandomGenerator> generators;
 
 /////// variables to be used later ///////
-std::string output_folder;
+//std::string output_folder;
 
 std::vector<int> pole (number_of_threads,0);  // JM: stores the z value of the close cell pole, redundant in the current implementation because always the same
 
@@ -223,6 +223,33 @@ void set_unconstrained_energies_to_zero();
 /////// script ///////
 
 int main() {
+    // Resize contact maps
+    total_contacts.resize(number_of_threads, std::vector<std::vector<double>>(bin_num, std::vector<double>(bin_num, 0.0)));
+    contacts.resize(number_of_threads);
+    contacts_lin.resize(number_of_threads);
+    contacts_inter.resize(number_of_threads);
+
+    // Resize location maps
+    locations.resize(number_of_threads);
+    locations_lin.resize(number_of_threads);
+
+    // Resize polymers
+    polymer.resize(number_of_threads);
+    lin_polymer.resize(number_of_threads);
+
+    // Resize scalar vectors
+    z_close.resize(number_of_threads, 0.0);
+    z_far.resize(number_of_threads, 0.0);
+    z_close_squared.resize(number_of_threads, 0.0);
+    z_far_squared.resize(number_of_threads, 0.0);
+
+    is_replicated.resize(number_of_threads, std::vector<bool>(pol_length, false));
+
+
+    // Resize z-mean and z-separation data
+    z_mean_data.resize(number_of_threads, std::vector<double>(sites_constrained_mean.size(), 0.0));
+    z_separation_data.resize(number_of_threads, std::vector<double>(sites_constrained_separation.size(), 0.0));
+
 
     std::cout << "bin number: " << bin_num << '\n' << "polymer length: " << pol_length << '\n' << "mc moves: " << mc_moves <<'\n' << "boundaries: " << boundary_cond << '\n' << "learning rate: " << learning_rate << '\n' << "saved in " << dir <<'\n';
 
@@ -258,6 +285,11 @@ int main() {
     char buffer [20];
     strftime(buffer, 20, "%Y-%m-%d_%H%M", now);
     std::string buffer_str = buffer; // converts to string
+
+    std::string general_output_folder = dir + buffer_str + "_averaged";
+    std::system(("mkdir -p " + general_output_folder + "/Contacts").c_str());
+    std::system(("mkdir -p " + general_output_folder + "/Energies").c_str());
+    std::system(("mkdir -p " + general_output_folder + "/Positions").c_str());
     
     for (int stage = 0; stage < number_of_stages; ++stage) {
         std::string stage_folder = buffer_str + "_stage_" + std::to_string(stages[stage]);
@@ -273,10 +305,17 @@ int main() {
 
     // create and seed random generators //
 
+    // for (int i = 0; i < number_of_threads; i++) {
+    //     int stage = i / replicates_per_stage; // Get the stage for this simulation
+    //     generators.push_back(RandomGenerator(int(time_now) + i, pol_length, lin_length[stage], oriC));
+    // }
+
+    generators.reserve(number_of_threads);
     for (int i = 0; i < number_of_threads; i++) {
-        int stage = i / replicates_per_stage; // Get the stage for this simulation
-        generators.push_back(RandomGenerator(int(time_now) + i, pol_length, lin_length[stage], oriC));
+        int stage = i / replicates_per_stage;
+        generators.emplace_back(int(time_now) + i, pol_length, lin_length[stage], oriC);
     }
+
 
 
     // set values offset_z WHY??//
@@ -298,7 +337,7 @@ int main() {
     }
 
     //Save the input parameters of the simulation in "sim_params.txt"//
-    get_sim_params();
+    get_sim_params(general_output_folder);
     std::cout<<"Initialising..."<<std::endl;
     //Initialize configurations//
     for (int i = 0; i < number_of_threads; i += number_of_threads_in_parallel) {
@@ -312,7 +351,31 @@ int main() {
         for (auto& t : iniThreads) {
             t.join();
         }
-}
+        // Debug check for threads 48–58 after initialization
+        for (int t = i; t < i + batch_size; ++t) {
+            if (t >= 48 && t <= 58) {
+                std::cout << "[Check] Thread " << t
+                        << ": polymer size = " << polymer[t].size()
+                        << ", lin_polymer size = " << lin_polymer[t].size()
+                        << ", generators valid = " << (t < generators.size())
+                        << ", is_replicated size = " << is_replicated[t].size()
+                        << std::endl;
+            }
+        }
+
+        for (int t = i; t < i + batch_size; ++t) {
+            if (t >= 48 && t <= 58) {
+                std::cout << "[Check] Thread " << t
+                        << ": contacts size = " << contacts[t].size()
+                        << ", contacts_lin size = " << contacts_lin[t].size()
+                        << ", contacts_inter size = " << contacts_inter[t].size()
+                        << ", locations size = " << locations[t].size()
+                        << ", locations_lin size = " << locations_lin[t].size()
+                        << std::endl;
+            }
+        }
+
+    }
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout<<"Burning in..."<<std::endl;
@@ -328,6 +391,10 @@ int main() {
             t.join();
         }
     }
+    
+
+    std::cout << "Running MC moves..." << std::endl;
+
     std::cout<<"Start gradient descent..."<<std::endl;
 
     // Perform inverse algorithm //
@@ -344,41 +411,19 @@ int main() {
             }
         }
 
-        std::vector<std::thread> threads(number_of_threads);
-        for (auto l = 0; l < number_of_threads; l++) {
-            threads[l] = std::thread(run, l, std::round(mc_moves * sqrt(step+1)));
+
+        std::cout << "Running MC moves..." << std::endl;
+
+        for (int i = 0; i < number_of_threads; i += number_of_threads_in_parallel) {
+            int batch_size = std::min(number_of_threads_in_parallel, number_of_threads - i);
+            std::vector<std::thread> runThreads(batch_size);
+            for (int j = 0; j < batch_size; ++j) {
+                runThreads[j] = std::thread(run, i + j, std::round(mc_moves * sqrt(step + 1)));
+            }
+            for (auto& t : runThreads) {
+                t.join();
+            }
         }
-        for (auto&& l : threads) {
-            l.join();
-        }
-
-        // //std::vector<double> w = {1., 1., 1., 1., 0.9270073, 0.35766423}; //biological weights
-
-        // std::vector<double> w = {1., 1., 1., 1., 1., 1.}; //uniform weights
-        // double w_sum = std::accumulate(w.begin(), w.end(), 0.0);
-        // for (auto& wi : w) wi /= w_sum;  // Normalize to sum to 1
-
-
-        // for (int s = 0; s < number_of_stages; s++) {
-        //     double weight = w[s] / replicates_per_stage;
-        //     for (int r = 0; r < replicates_per_stage; r++) {
-        //         int idx = s * replicates_per_stage + r;
-        //         for (int i = 0; i < bin_num; i++) {
-        //             for (int j = 0; j < bin_num; j++) {
-        //                 final_contacts[i][j] += weight * total_contacts[idx][i][j];
-        //             }
-        //         }
-        //     }
-        // } 
-
-        // //After all threads finish, their contact maps (total_contacts) are summed into a global matrix final_contacts//
-        // for (int l = 0; l < number_of_threads; l++) {
-        //     for (int i = 0; i < bin_num; i++) {
-        //         for (int j = 0; j < bin_num; j++) {
-        //             final_contacts[i][j] += total_contacts[l][i][j];
-        //         }
-        //     }
-        // }
 
 
         // Step 1: average over replicates per stage
@@ -413,14 +458,6 @@ int main() {
             }
         }
 
-        // Divide to get mean over stages
-        for (int i = 0; i < bin_num; i++) {
-            for (int j = 0; j < bin_num; j++) {
-                final_contacts_averaged[i][j] /= number_of_stages;
-            }
-        }
-
-
         //Ensures final_contacts_averaged is symmetric//
         for (int i = 0; i < bin_num; i++) {
             for (int j = 0; j < bin_num; j++) {
@@ -437,24 +474,30 @@ int main() {
             }
         }
 
-        for (int l = 0; l < number_of_threads; l++){
-            get_configuration(step, "strand", l);
-            get_configuration(step, "ring", l); //JM: Seems to save the configurations at the end of each iteration
+        //Saves configuration of the strand and ring for each thread with a separate file for each stage at the end of each step
+        for (int l = 0; l < number_of_threads; l++) {
+            int s = l / replicates_per_stage;
+            std::string output_folder = buffer_str + "_stage_" + std::to_string(stages[s]);
+
+            get_configuration(step, "strand", l, output_folder);
+            get_configuration(step, "ring", l, output_folder);
         }
+
 
 
         //calculation of positional constraint values after forward run//
 
         for (int l=0; l < number_of_threads; l++) { //JM: calculation of average z coordinates & squares of both oris
-            if (lin_length[l%number_of_stages]==0) {
-                z_close_tot[l%number_of_stages] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
-                z_close_squared_tot[l%number_of_stages] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+            int stage = l / replicates_per_stage;
+            if (lin_length[stage]==0) {
+                z_close_tot[stage] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_close_squared_tot[stage] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
             else {
-                z_close_tot[l%number_of_stages] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
-                z_far_tot[l%number_of_stages] += z_far[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
-                z_close_squared_tot[l%number_of_stages] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
-                z_far_squared_tot[l%number_of_stages] += z_far_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_close_tot[stage] += z_close[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_far_tot[stage] += z_far[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_close_squared_tot[stage] += z_close_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
+                z_far_squared_tot[stage] += z_far_squared[l]/number_of_threads*number_of_stages/std::round(mc_moves * sqrt(step+1))*res;
             }
             //calculating z_mean_data_tot and z_separation_data_tot
             for(int i=0; i<sites_constrained_mean.size(); i++){
@@ -480,18 +523,18 @@ int main() {
         update_alpha_beta(step);
 
         //save simulation parameters//
-        get_final_contacts(step);
-        get_final_contacts_averaged(step);
-        get_energ_coeff_mean(step);
-        get_energ_coeff_separation(step);
-        get_alpha_beta(step); //JM: Saves new values alpha and beta
-        get_z_lin_far_close(step); //JM: Saves new values ori positions
-        get_energies_plot(step); //JM: Saves pairwise interaction energies
+        get_final_contacts(step, buffer_str);
+        get_final_contacts_averaged(step, general_output_folder);
+        get_energ_coeff_mean(step,general_output_folder);
+        get_energ_coeff_separation(step,general_output_folder);
+        get_alpha_beta(step,general_output_folder); //JM: Saves new values alpha and beta
+        get_z_lin_far_close(step,general_output_folder); //JM: Saves new values ori positions
+        get_energies_plot(step,general_output_folder); //JM: Saves pairwise interaction energies
         for (int i=0;i< n_constrained_mean;i++){
-            get_z_mean_rest(i, step);
+            get_z_mean_rest(i, step,general_output_folder);
         }
         for (int i=0;i< n_constrained_separation;i++){
-            get_z_separation_rest(i, step);
+            get_z_separation_rest(i, step,general_output_folder);
         }
 
         clean_up(); //JM: sets everything to zero again before next round

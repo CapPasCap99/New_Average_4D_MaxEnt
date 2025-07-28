@@ -13,6 +13,7 @@ Note that polymer and lin_polymer arrays use full indeces; these keep track of u
 std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts(number_of_threads);
 std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> locations(number_of_threads);
 
+
 std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts_inter(number_of_threads);
 std::vector<std::unordered_map<std::pair<int, int>, int, pair_hash>> contacts_lin(number_of_threads);
 std::vector<std::unordered_map<std::vector<int>, std::vector<int>, vec_hash>> locations_lin(number_of_threads);
@@ -158,12 +159,23 @@ void initialize(int thread_num, int step) {
 
 
 void burn_in(int thread_num, int n_steps) {
+    assert(thread_num < number_of_threads);
+    assert(polymer[thread_num].size() == pol_length);
+    assert(lin_polymer[thread_num].size() == pol_length);
+    assert(total_contacts[thread_num].size() == bin_num);
+    assert(total_contacts[thread_num][0].size() == bin_num);
+    assert(z_mean_data[thread_num].size() == sites_constrained_mean.size());
+    assert(z_separation_data[thread_num].size() == sites_constrained_separation.size());
+
+
     for (int m = 0; m < n_steps ; m++) {   //burn-in
         move(thread_num, m);
     }
+
 //    int stage = thread_num % number_of_stages;
 //    int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
     int stage = thread_num / replicates_per_stage;
+
 
     std::vector<double> zeroVec(bin_num, 0);
     std::fill(total_contacts[thread_num].begin(), total_contacts[thread_num].end(), zeroVec);
@@ -171,12 +183,14 @@ void burn_in(int thread_num, int n_steps) {
     z_far[thread_num] = 0;
     z_close_squared[thread_num] = 0;
     z_far_squared[thread_num] = 0;
+
     for(int i=0; i<sites_constrained_mean.size(); i++){
         z_mean_data[thread_num][i] = 0;
     }
     for(int i=0; i<sites_constrained_separation.size(); i++){
         z_separation_data[thread_num][i] = 0;
     }
+
     //z[thread_num] = 0;
     //z_lin[thread_num] = 0;
     locations[thread_num].clear();
@@ -255,6 +269,8 @@ void burn_in(int thread_num, int n_steps) {
             }
         }
     }
+
 }
 
 #endif
+
