@@ -64,7 +64,7 @@ const int replicates_per_stage = number_of_threads / number_of_stages;
 const std::string bacteria_name = "crescentus_separations_3"; //Determines which input files will be used
 const int bin_num = 405; //Crescentus
 const int reduction_factor = 4; //Crescentus
-const int oriC = 0; // Crescentus   //position of the origin of replication. Determines where replication is initiated.
+const int oriC = 1220; // Crescentus   //position of the origin of replication. Determines where replication is initiated.
 double radius{ 3.2 }; // Crescentus
 
 
