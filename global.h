@@ -69,12 +69,15 @@ extern std::vector<std::vector<double>> z_mean_data;
 extern std::vector<std::vector<double>> z_separation_data;
 extern std::vector<std::vector<double>> z_mean_data_tot;
 extern std::vector<std::vector<double>> z_separation_data_tot;
+extern std::vector<std::vector<unsigned long long>> z_separation_samples;
+extern std::vector<std::vector<unsigned long long>> z_mean_samples;
 
 extern std::string dir;
 extern std::string output_folder;
 extern std::string HiC_file;
 extern bool initConfig;
-extern std::string configuration_data_folder;
+extern bool burn_in_done;
+extern std::string old_simulation_folder;
 
 extern const std::string bacteria_name;
 extern const int bin_num;
@@ -125,22 +128,34 @@ extern std::vector<double> z_close_var;
 
 extern bool boundary_cond;
 extern double radius;
-extern const std::vector<double> length;
+//extern const std::vector<double> length; //if defined in main() as a constant
+extern std::vector<double> length;
 extern const int x_axis;
 extern const int y_axis;
 extern const int z_axis;
 extern std::vector<double> offset;
-extern std::vector<double> offset_z;
 extern bool constrain_pol;
 extern bool use_fork_distribution;
 
-extern const std::vector<int> lin_length;
+//extern const std::vector<int> lin_length; //if defined in main() as a constant
+extern std::vector<int> lin_length;
 extern const int oriC;
+extern const int Ter;
 
 extern std::vector<std::vector< std::vector<double>>> total_contacts;
 extern std::vector<std::vector<std::vector<double>>> final_contacts;
 extern std::vector<std::vector<double>> final_contacts_averaged;
 extern std::vector<std::vector<double>> xp_contacts;
+
+// params.h
+extern double learning_rate;
+extern double learning_rate_close;
+extern double learning_rate_far;
+extern double learning_rate_close_var;
+extern double learning_rate_far_var;
+extern double learning_rate_means;
+extern double learning_rate_separations;
+
 
 extern std::vector<double> w;
 

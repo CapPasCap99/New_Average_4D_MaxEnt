@@ -137,9 +137,11 @@ bool constr_move(int thread_num, Eigen::Vector3i prop_move, int lin_pol, int sit
 //  int stage = thread_num % number_of_stages;
 //  int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
     int stage = thread_num / replicates_per_stage;
+    double offset_stage = (int(length[stage]) % 2) / 2.0;
+
     if (constrain_pol && site == oriC) {
         if (lin_pol) {
-            if (std::abs(prop_move[2] - offset_z[stage]) > std::abs(polymer[thread_num][site][2] - offset_z[stage])) {
+            if (std::abs(prop_move[2] - offset_stage) > std::abs(polymer[thread_num][site][2] - offset_stage)) {
                 return false; //If the proposed move in the linear polymer brings it further away from the cell center than the circular polymer ori, deny move
             }
             else {
@@ -147,10 +149,10 @@ bool constr_move(int thread_num, Eigen::Vector3i prop_move, int lin_pol, int sit
             }
         }
         else {
-            if(prop_move[2] > offset_z[stage]){ //GG: to keep the "focus closest to a pole" in the left half of the cell. (that's how the experimental data for ecoli is processed)
+            if(prop_move[2] > offset_stage){ //GG: to keep the "focus closest to a pole" in the left half of the cell. (that's how the experimental data for ecoli is processed)
                 return false; //GG: ok, I see now that this condition was already included below
             }
-            if (std::abs(prop_move[2] - offset_z[stage]) < std::abs(lin_polymer[thread_num][site][2] - offset_z[stage]) || prop_move[2] > 0) {
+            if (std::abs(prop_move[2] - offset_stage) < std::abs(lin_polymer[thread_num][site][2] - offset_stage) || prop_move[2] > offset_stage) {
                 return false; //If the proposed move on the circular polymer brings it closer to the cell center than the linear polymer ori, or it moves past the midpoint, deny move
             }
             else {
@@ -166,14 +168,15 @@ bool check_boundary_rest(Eigen::Vector3i prop_move1, int thread_num) {
 //  int stage = thread_num % number_of_stages;
 //  int stage = thread_num; //GG: when length.size()=numofthreads (needed for fork distribution)
     int stage = thread_num / replicates_per_stage;
+    double offset_stage = (int(length[stage]) % 2) / 2.0;
     if (boundary_cond == 1) {
         bool accept_1;
         // GG: check for prop_move1
-        if (std::abs(prop_move1[2] - offset_z[stage]) <= length[stage] / 2) { //GG: is inside the cylinder, not in a cap (z-coord)
+        if (std::abs(prop_move1[2] - offset_stage) <= length[stage] / 2) { //GG: is inside the cylinder, not in a cap (z-coord)
             accept_1 = (pow(prop_move1[0]+offset[0], 2) + pow(prop_move1[1]+offset[1], 2) <= pow(radius, 2));
         }
-        else if (std::abs(prop_move1[2] - offset_z[stage]) <= length[stage] / 2 + radius) { // GG: is in one of the caps (z-coord)
-            accept_1 = (pow(prop_move1[0]+offset[0], 2) + pow(prop_move1[1]+offset[1], 2) + pow(std::abs(prop_move1[2] - offset_z[stage]) - length[stage] / 2, 2) <= pow(radius, 2));
+        else if (std::abs(prop_move1[2] - offset_stage) <= length[stage] / 2 + radius) { // GG: is in one of the caps (z-coord)
+            accept_1 = (pow(prop_move1[0]+offset[0], 2) + pow(prop_move1[1]+offset[1], 2) + pow(std::abs(prop_move1[2] - offset_stage) - length[stage] / 2, 2) <= pow(radius, 2));
         }
         else {
             accept_1 = 0;
@@ -379,6 +382,7 @@ void loop_move_lin(int thread_num, int site, int &m, int lin_pol) {
     }
 }
 
+
 void move(int thread_num, int &m) {
     // if (thread_num>48){
     //     std::cout << "[Move] Thread " << thread_num << ", Step " << m << std::endl;
@@ -536,20 +540,33 @@ void move(int thread_num, int &m) {
             z_close_squared[thread_num] += pow(polymer[thread_num][oriC][2], 2);
             z_far_squared[thread_num] += pow(lin_polymer[thread_num][oriC][2], 2);
 
-            for(int i=0; i<sites_constrained_mean.size(); i++){
-                if(not is_replicated[thread_num][sites_constrained_mean[i]]){
-                    z_mean_data[thread_num][i] += polymer[thread_num][ sites_constrained_mean[i] ][2];
+            for (int i = 0; i < sites_constrained_mean.size(); i++) {
+                int site = sites_constrained_mean[i];
+                if (not is_replicated[thread_num][site]) {
+                    // For non-replicated sites, take the z-position from the ring polymer
+                    z_mean_data[thread_num][i] += polymer[thread_num][site][2];
                 }
-                else if(include_replicated_in_mean){
-                    z_mean_data[thread_num][i] += (polymer[thread_num][ sites_constrained_mean[i] ][2] + lin_polymer[thread_num][ sites_constrained_mean[i] ][2])/2.;
+                else {
+                    // For replicated sites, take the average of the z-position from the ring and linear polymer
+                    z_mean_data[thread_num][i] += (polymer[thread_num][site][2] + lin_polymer[thread_num][site][2]) / 2.0;
                 }
-            }
-            for(int i=0; i<sites_constrained_separation.size(); i++) {
-                if (is_replicated[thread_num][sites_constrained_separation[i]]) {
-                    z_separation_data[thread_num][i] += std::abs(polymer[thread_num][sites_constrained_separation[i]][2] - lin_polymer[thread_num][sites_constrained_separation[i]][2]);
-                }
+                z_mean_samples[thread_num][i] += 1;
             }
         }
+            // for(int i=0; i<sites_constrained_separation.size(); i++) {
+            //     if (is_replicated[thread_num][sites_constrained_separation[i]]) {
+            //         z_separation_data[thread_num][i] += std::abs(polymer[thread_num][sites_constrained_separation[i]][2] - lin_polymer[thread_num][sites_constrained_separation[i]][2]);
+            //     }
+            // }
+
+            if (lin_length[stage] > 0 && is_replicated[thread_num][oriC] && !z_separation_data[thread_num].empty() && !z_separation_samples[thread_num].empty()) {
+            double z_ring = polymer[thread_num][oriC][2];
+            double z_lin  = lin_polymer[thread_num][oriC][2];
+            z_separation_data[thread_num][0] += std::abs(z_lin - z_ring);
+            z_separation_samples[thread_num][0] += 1;   // one sample taken
+
+            }
+
     }
     else if(lin_pol==0) {  //simulate only one polymer // GG: with a non_replicated polymer, it still does something if lin_pol=1... (corrected now)
         int action = generators[thread_num].unimove();
