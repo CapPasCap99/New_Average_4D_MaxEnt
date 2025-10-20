@@ -77,7 +77,7 @@ void initialize(int thread_num, int step) {
 
     // Construct initial configurations from saved configurations//
     if (initConfig) {
-        check_input_configuration_compatibility(configuration_data_folder);
+        check_input_configuration_compatibility(old_simulation_folder);
         read_configuration("ring",  thread_num, step);
         read_configuration("strand", thread_num, step);
     }
@@ -168,7 +168,7 @@ void burn_in(int thread_num, int n_steps) {
     assert(z_separation_data[thread_num].size() == sites_constrained_separation.size());
 
 
-    for (int m = 0; m < n_steps ; m++) {   //burn-in
+    for (int m = 0; m < n_steps; ) {   //burn-in
         move(thread_num, m);
     }
 
